@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "insaat-metraj-web",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "InsaatMetrajWeb"],
+      "port": 5000
+    }
+  ]
+}

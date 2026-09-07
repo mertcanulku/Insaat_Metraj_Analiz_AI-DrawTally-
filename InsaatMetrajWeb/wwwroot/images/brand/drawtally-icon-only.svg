@@ -1,0 +1,14 @@
+<svg width="680" height="680" viewBox="0 0 680 680" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>DrawTally ikon</title>
+<desc>Yazısız, ölçü çizgisi uçlu D harfi ve içine yerleştirilmiş çetele işaretinden oluşan lacivert kare ikon</desc>
+<rect x="40" y="40" width="600" height="600" rx="96" fill="#16242B"/>
+<rect x="200" y="180" width="52" height="380" rx="12" fill="#D8E4EA"/>
+<path d="M252,184 C 484,184 484,556 252,556" stroke="#D8E4EA" stroke-width="44" fill="none" stroke-linecap="round"/>
+<line x1="186" y1="160" x2="258" y2="200" stroke="#1F5F8B" stroke-width="16" stroke-linecap="round"/>
+<line x1="186" y1="540" x2="258" y2="580" stroke="#1F5F8B" stroke-width="16" stroke-linecap="round"/>
+<line x1="346" y1="310" x2="346" y2="430" stroke="#1F5F8B" stroke-width="18" stroke-linecap="round"/>
+<line x1="380" y1="310" x2="380" y2="430" stroke="#1F5F8B" stroke-width="18" stroke-linecap="round"/>
+<line x1="414" y1="310" x2="414" y2="430" stroke="#1F5F8B" stroke-width="18" stroke-linecap="round"/>
+<line x1="448" y1="310" x2="448" y2="430" stroke="#1F5F8B" stroke-width="18" stroke-linecap="round"/>
+<line x1="330" y1="434" x2="464" y2="306" stroke="#1F5F8B" stroke-width="18" stroke-linecap="round"/>
+</svg>

@@ -37,48 +37,39 @@ body {
 .sidebar {
     width: 250px;
     flex-shrink: 0;
-    background: var(--blueprint);
-    color: var(--blueprint-ink);
+    background: var(--sheet);
+    color: var(--ink);
+    border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
     padding: 28px 22px;
 }
 
 .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 34px; }
-.brand-mark {
-    width: 34px; height: 34px;
-    border: 1px solid var(--blueprint-ink);
-    border-radius: var(--radius);
-    display: flex; align-items: center; justify-content: center;
-    font-family: "IBM Plex Mono", monospace;
-    font-weight: 600;
-    flex-shrink: 0;
-}
-.brand-name { font-weight: 600; font-size: 0.98rem; letter-spacing: 0.01em; }
-.brand-sub { font-size: 0.78rem; color: #93A6AE; margin-top: 2px; }
+.brand-logo { max-width: 180px; height: auto; }
 
 .nav-links { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .nav-links a {
-    color: #B9C7CC;
+    color: var(--ink-soft);
     text-decoration: none;
     padding: 10px 10px 10px 14px;
     font-size: 0.92rem;
     border-left: 2px solid transparent;
     transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
-.nav-links a:hover { color: var(--blueprint-ink); background: rgba(255,255,255,0.04); }
+.nav-links a:hover { color: var(--ink); background: var(--paper); }
 .nav-links a.active {
-    color: var(--blueprint-ink);
+    color: var(--ink);
     border-left: 2px solid var(--accent);
-    background: rgba(255,255,255,0.06);
+    background: var(--accent-soft);
     font-weight: 500;
 }
 
 .sidebar-foot {
     font-family: "IBM Plex Mono", monospace;
     font-size: 0.72rem;
-    color: #6E8088;
-    border-top: 1px solid rgba(255,255,255,0.12);
+    color: var(--ink-soft);
+    border-top: 1px solid var(--line-soft);
     padding-top: 14px;
     margin-top: 14px;
 }

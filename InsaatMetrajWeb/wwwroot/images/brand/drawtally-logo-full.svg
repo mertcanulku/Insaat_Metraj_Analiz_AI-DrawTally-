@@ -1,0 +1,16 @@
+<svg width="680" height="460" viewBox="0 0 680 460" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>DrawTally logo</title>
+<desc>Koyu lacivert rozet içinde, ölçü çizgisi uçlu bir D harfi ve gövdesinin içine yerleştirilmiş beşli çetele işareti, altında DrawTally yazısı</desc>
+<rect x="190" y="40" width="300" height="300" rx="48" fill="#16242B"/>
+<rect x="270" y="110" width="26" height="190" rx="6" fill="#D8E4EA"/>
+<path d="M296,112 C 412,112 412,298 296,298" stroke="#D8E4EA" stroke-width="22" fill="none" stroke-linecap="round"/>
+<line x1="263" y1="100" x2="299" y2="120" stroke="#1F5F8B" stroke-width="8" stroke-linecap="round"/>
+<line x1="263" y1="290" x2="299" y2="310" stroke="#1F5F8B" stroke-width="8" stroke-linecap="round"/>
+<line x1="343" y1="175" x2="343" y2="235" stroke="#1F5F8B" stroke-width="9" stroke-linecap="round"/>
+<line x1="360" y1="175" x2="360" y2="235" stroke="#1F5F8B" stroke-width="9" stroke-linecap="round"/>
+<line x1="377" y1="175" x2="377" y2="235" stroke="#1F5F8B" stroke-width="9" stroke-linecap="round"/>
+<line x1="394" y1="175" x2="394" y2="235" stroke="#1F5F8B" stroke-width="9" stroke-linecap="round"/>
+<line x1="335" y1="237" x2="402" y2="173" stroke="#1F5F8B" stroke-width="9" stroke-linecap="round"/>
+<text x="340" y="405" text-anchor="middle" fill="#16242B" style="font-family: Arial, sans-serif; font-size: 44px; font-weight: 700;">DrawTally</text>
+<text x="340" y="434" text-anchor="middle" fill="#6B7A80" style="font-family: Arial, sans-serif; font-size: 17px; font-weight: 400;">by Drongos Global</text>
+</svg>
