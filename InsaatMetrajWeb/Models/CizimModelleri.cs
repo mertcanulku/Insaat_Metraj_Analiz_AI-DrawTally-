@@ -1,39 +1,52 @@
 namespace InsaatMetrajWeb.Models;
 
-/// <summary>
-/// Bir CAD katmanından (layer) çıkarılan geometrik sinyaller — sabit bir
-/// isim eşleştirmesi değil, yapay zekanın "bu ne olabilir?" diye akıl
-/// yürütmesi için ham veri. Katman ismi hangi dilde/kısaltmada olursa
-/// olsun, geometri (kalınlık, kapalılık, şekil) tutarlı bir ipucu verir.
-/// </summary>
-public class CizimKatmanSinyali
+/// <summary>Bir oda/alan değerinin nereden geldiği — kullanıcıya güven düzeyini göstermek için.</summary>
+public enum KaynakTuru
 {
-    public string LayerAdi { get; set; } = "";
-    public int EntitySayisi { get; set; }
-    public bool KapaliMi { get; set; }
-    public double OrtSegmentUzunlugu { get; set; }
-    public double CizgiKalinligi { get; set; }
-    public double EnBoyOrani { get; set; }
-    public double ToplamUzunluk { get; set; }
-    public double ToplamAlan { get; set; }
+    /// <summary>PDF'in seçilebilir metin katmanından okundu (oda adı/alan yazısı).</summary>
+    VektorMetin,
+    /// <summary>DWG'deki kapalı bir poligondan shoelace formülüyle hesaplandı (deterministik).</summary>
+    VektorGeometri,
+    /// <summary>Metin katmanı yoktu veya yetersizdi — sayfa/bölge görsel olarak yapay zekaya gönderildi.</summary>
+    AIGorsel
 }
 
-/// <summary>Yapay zekanın bir katman için verdiği sınıflandırma kararı.</summary>
-public class AiKatmanSinifi
+/// <summary>Bir satırın ne kadar güvenilir olduğuna dair kabaca üç seviyeli özet.</summary>
+public enum GuvenSkoru
 {
-    public int? PozId { get; set; }
-    public int Guven { get; set; }
-    public string Gerekce { get; set; } = "";
-    public string KullanilanModel { get; set; } = "";
+    Dusuk,
+    Orta,
+    Yuksek
 }
 
 /// <summary>
-/// Bir katmanın tam analiz sonucu: geometrik sinyaller + AI'nin önerisi.
+/// PDF veya DWG çiziminden çıkarılan tek bir oda/alan satırı — iki ayrı
+/// pipeline (PDF ve DWG) aynı modele yazar, aynı onay tablosunda gösterilir.
 /// Kullanıcı onaylamadan proje.MetrajKalemleri'ne eklenmez.
 /// </summary>
 public class CizimAnalizSonucu
 {
-    public CizimKatmanSinyali Sinyal { get; set; } = new();
-    public AiKatmanSinifi Oneri { get; set; } = new();
-    public bool Eklendi { get; set; }
+    public string OdaAdi { get; set; } = "";
+    public decimal AlanM2 { get; set; }
+    public string KatAdi { get; set; } = "";
+    public KaynakTuru KaynakTuru { get; set; }
+    public GuvenSkoru GuvenSkoru { get; set; }
+    public bool OnaylandiMi { get; set; }
+
+    /// <summary>Yapay zekanın önerdiği poz (varsa) — kullanıcı onaylayınca bu poz metraj kalemi olarak eklenir.</summary>
+    public int? OnerilenPozId { get; set; }
+    public string OneriGerekcesi { get; set; } = "";
+    public string KullanilanModel { get; set; } = "";
+}
+
+/// <summary>AiSiniflandirmaServisi'nin bir metin kümesinden veya görselden ürettiği yapılandırılmış sonuç.</summary>
+public class OdaYapilandirmaSonucu
+{
+    public string OdaAdi { get; set; } = "";
+    public decimal? AlanM2 { get; set; }
+    public string KatAdi { get; set; } = "";
+    public int Guven { get; set; } // 0-100
+    public int? OnerilenPozId { get; set; }
+    public string Gerekce { get; set; } = "";
+    public string KullanilanModel { get; set; } = "";
 }

@@ -10,8 +10,11 @@ builder.Services.AddRazorComponents()
 // İleride bu servis, gerçek bir veritabanı (PostgreSQL/SQL Server) ile değiştirilecek.
 builder.Services.AddSingleton<VeriDeposu>();
 
-// DWG/DXF katman sınıflandırması için Claude API'sine bağlanan servis.
+// PDF/DWG çizim analizi (oda adı + alan çıkarımı) için Claude API'sine bağlanan servis.
 builder.Services.AddHttpClient<AiSiniflandirmaServisi>();
+
+// PDF/DWG çizimlerinden oda/alan çıkaran ortak analiz servisi (AiSiniflandirmaServisi + VeriDeposu üzerine kurulu).
+builder.Services.AddScoped<CizimAnalizServisi>();
 
 var app = builder.Build();
 

@@ -1,6 +1,7 @@
 @page "/proje/{ProjeId:int}/proje-import"
 @inject VeriDeposu Veri
 @inject AiSiniflandirmaServisi AiServisi
+@inject CizimAnalizServisi CizimAnalizServisi
 @inject IJSRuntime JS
 
 @if (proje == null)
@@ -18,11 +19,14 @@ else
             Örnek: <code>beton pompa;Perde duvar temeli;15.6</code>
         </li>
         <li>
-            <strong>PDF</strong> — dijital (metni seçilebilir) bir metraj/keşif PDF'i. <em>Taranmış (resim) PDF'lerde çalışmaz.</em>
+            <strong>PDF</strong> — dijital (metni seçilebilir) bir metraj/keşif PDF'i olarak okunur; ayrıca
+            yapay zeka çizimdeki oda adlarını ve alanlarını (m²) çıkarıp poz önerir. Taranmış (resim) PDF'lerde
+            keşif satırı okunamaz, oda analizi görsel üzerinden denenir.
         </li>
         <li>
-            <strong>DWG / DXF</strong> — Proje dosyalarınızı. Katmanların geometrisi çıkarılıp yapay zekaya
-            hangi poza karşılık geldiği sorulur; öneriler elle onaylanana kadar projeye eklenmez.
+            <strong>DWG / DXF</strong> — kapalı poligonlardan (oda sınırları) alan shoelace formülüyle
+            deterministik hesaplanır, en yakın metin oda adı olarak eşleştirilir, yapay zeka her odaya bir
+            poz önerir; öneriler elle onaylanana kadar projeye eklenmez.
         </li>
     </ul>
     <p>
@@ -38,6 +42,15 @@ else
             <div class="dropzone-formats">CSV · PDF · DWG · DXF</div>
         </div>
         <InputFile OnChange="DosyaYuklendi" accept=".csv,.txt,.pdf,.dwg,.dxf" class="dropzone-input" />
+    </div>
+
+    <div class="upload-notice">
+        <span class="upload-notice-icon">ℹ️</span>
+        <span class="upload-notice-text">
+            En iyi sonuç için PDF çizimlerin yüksek çözünürlüklü ve vektörel (taranmış değil) olmasına,
+            DWG çizimlerdeki metinlerin patlatılmamış (düzenlenebilir metin nesnesi olarak kalmış) olmasına
+            dikkat edin — bu, hata ve tekrar işi ihtimalini önemli ölçüde azaltır.
+        </span>
     </div>
 
     @if (isleniyor)
@@ -88,38 +101,52 @@ else
         }
     }
 
-    @if (cizimSonuclari.Count > 0)
+    @if (odaSonuclari.Count > 0)
     {
-        <h3>Yapay Zeka Önerileri (Çizim)</h3>
+        var onaysizSayisi = odaSonuclari.Count(s => !s.OnaylandiMi);
+        <h3>Çizim Analizi — Oda/Alan Önerileri (@sonYuklenenFormat)</h3>
+        <p>
+            Aşağıdaki satırlar sadece öneridir; hiçbiri onaylanmadan projenin metraj tablosuna eklenmez.
+            @if (onaysizSayisi > 0)
+            {
+                <button @onclick="TumunuOnayla">Tümünü Onayla ve Ekle (@onaysizSayisi)</button>
+            }
+        </p>
         <table class="veri-tablo">
             <thead>
                 <tr>
-                    <th>Katman</th>
+                    <th>Oda Adı</th>
+                    <th>Alan (m²)</th>
+                    <th>Kat</th>
+                    <th>Kaynak</th>
+                    <th>Güven</th>
                     <th>Önerilen Poz</th>
-                    <th>Gerekçe</th>
-                    <th>Güven / Model</th>
+                    <th>Gerekçe / Model</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                @for (int i = 0; i < cizimSonuclari.Count; i++)
+                @for (int i = 0; i < odaSonuclari.Count; i++)
                 {
                     var index = i;
-                    var s = cizimSonuclari[index];
-                    var poz = s.Oneri.PozId.HasValue ? Veri.Pozlar.FirstOrDefault(p => p.Id == s.Oneri.PozId) : null;
-                    <tr class="@(s.Eklendi ? "satir-basarili" : (poz == null ? "satir-hatali" : ""))">
-                        <td>@s.Sinyal.LayerAdi</td>
+                    var s = odaSonuclari[index];
+                    var poz = s.OnerilenPozId.HasValue ? Veri.Pozlar.FirstOrDefault(p => p.Id == s.OnerilenPozId) : null;
+                    <tr class="@(s.OnaylandiMi ? "satir-basarili" : (poz == null ? "satir-hatali" : ""))">
+                        <td>@s.OdaAdi</td>
+                        <td>@s.AlanM2.ToString("0.00")</td>
+                        <td>@(string.IsNullOrWhiteSpace(s.KatAdi) ? "—" : s.KatAdi)</td>
+                        <td>@KaynakEtiketi(s.KaynakTuru)</td>
+                        <td>@s.GuvenSkoru</td>
                         <td>@(poz != null ? $"{poz.PozKodu} — {poz.Ad}" : "—")</td>
-                        <td style="font-size:0.85rem">@s.Oneri.Gerekce</td>
-                        <td>%@s.Oneri.Guven — @s.Oneri.KullanilanModel</td>
+                        <td style="font-size:0.85rem">@s.OneriGerekcesi @(!string.IsNullOrEmpty(s.KullanilanModel) ? $"({s.KullanilanModel})" : "")</td>
                         <td>
-                            @if (s.Eklendi)
+                            @if (s.OnaylandiMi)
                             {
                                 <span>✓ Eklendi</span>
                             }
                             else if (poz != null)
                             {
-                                <button @onclick="() => CizimOnerisiOnayla(index)">Onayla ve Ekle</button>
+                                <button @onclick="() => OdaOnerisiOnayla(index)">Onayla ve Ekle</button>
                             }
                         </td>
                     </tr>
@@ -139,7 +166,7 @@ else
     private string genelHataMesaji = "";
     private string sonYuklenenFormat = "";
     private List<ImportSonucSatiri> importSonuclari = new();
-    private List<CizimAnalizSonucu> cizimSonuclari = new();
+    private List<CizimAnalizSonucu> odaSonuclari = new();
 
     protected override void OnParametersSet()
     {
@@ -161,7 +188,7 @@ else
         isleniyor = true;
         genelHataMesaji = "";
         importSonuclari = new();
-        cizimSonuclari = new();
+        odaSonuclari = new();
         StateHasChanged();
 
         var dosyaAdi = e.File.Name.ToLowerInvariant();
@@ -170,7 +197,7 @@ else
         {
             if (dosyaAdi.EndsWith(".dwg") || dosyaAdi.EndsWith(".dxf"))
             {
-                await CizimDosyasiIsle(e);
+                await DwgCizimAnaliziYap(e);
             }
             else if (dosyaAdi.EndsWith(".pdf"))
             {
@@ -184,8 +211,13 @@ else
 
                 if (importSonuclari.Count == 0)
                 {
-                    genelHataMesaji = "PDF'den hiç satır okunamadı — dosya taranmış (resim) bir PDF olabilir, bu durumda metin katmanı olmadığı için otomatik okuma yapılamıyor.";
+                    genelHataMesaji = "PDF'den hiç keşif satırı okunamadı — dosya taranmış (resim) bir PDF olabilir, bu durumda metin katmanı olmadığı için otomatik okuma yapılamıyor.";
                 }
+
+                bellekAkisi.Position = 0;
+                isleniyorMesaji = "Yapay zeka çizimdeki oda/alanları değerlendiriyor...";
+                StateHasChanged();
+                odaSonuclari = await CizimAnalizServisi.PdfAnalizEt(bellekAkisi, e.File.Name);
             }
             else
             {
@@ -205,9 +237,10 @@ else
         isleniyor = false;
     }
 
-    private async Task CizimDosyasiIsle(InputFileChangeEventArgs e)
+    private async Task DwgCizimAnaliziYap(InputFileChangeEventArgs e)
     {
-        isleniyorMesaji = "Çizim okunuyor, geometrik sinyaller çıkarılıyor...";
+        sonYuklenenFormat = "DWG/DXF";
+        isleniyorMesaji = "Çizim okunuyor, oda geometrisi (kapalı poligonlar) ve metinler çıkarılıyor...";
         StateHasChanged();
 
         using var stream = e.File.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024); // 50MB sınır
@@ -215,27 +248,45 @@ else
         await stream.CopyToAsync(bellekAkisi);
         bellekAkisi.Position = 0;
 
-        var sinyaller = Veri.CizimSinyalleriniCikar(bellekAkisi, e.File.Name);
+        odaSonuclari = CizimAnalizServisi.DwgAnalizEt(bellekAkisi, e.File.Name);
 
-        for (int i = 0; i < sinyaller.Count; i++)
+        if (odaSonuclari.Count == 0)
         {
-            isleniyorMesaji = $"Yapay zeka katmanları değerlendiriyor... ({i + 1}/{sinyaller.Count})";
-            StateHasChanged();
+            genelHataMesaji = "Çizimde kapalı poligon (oda/alan sınırı) bulunamadı.";
+            return;
+        }
 
-            var oneri = await AiServisi.SiniflandirAsync(sinyaller[i], Veri.Pozlar);
-            cizimSonuclari.Add(new CizimAnalizSonucu { Sinyal = sinyaller[i], Oneri = oneri });
+        isleniyorMesaji = "Yapay zeka her oda için poz önerisi hazırlıyor...";
+        StateHasChanged();
+        await CizimAnalizServisi.DwgPozOnerileriniEkleAsync(odaSonuclari, e.File.Name);
+    }
+
+    private void OdaOnerisiOnayla(int index)
+    {
+        if (proje == null) return;
+        var s = odaSonuclari[index];
+        if (!s.OnerilenPozId.HasValue) return;
+        var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.OnerilenPozId);
+        if (poz == null) return;
+
+        Veri.OdaAnalizSonucunuOnayla(proje, s, poz);
+    }
+
+    private void TumunuOnayla()
+    {
+        if (proje == null) return;
+        foreach (var s in odaSonuclari.Where(s => !s.OnaylandiMi && s.OnerilenPozId.HasValue))
+        {
+            var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.OnerilenPozId);
+            if (poz != null) Veri.OdaAnalizSonucunuOnayla(proje, s, poz);
         }
     }
 
-    private void CizimOnerisiOnayla(int index)
+    private static string KaynakEtiketi(KaynakTuru kaynak) => kaynak switch
     {
-        if (proje == null) return;
-        var s = cizimSonuclari[index];
-        if (!s.Oneri.PozId.HasValue) return;
-        var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.Oneri.PozId);
-        if (poz == null) return;
-
-        Veri.CizimOnerisiniOnayla(proje, s.Sinyal, poz);
-        s.Eklendi = true;
-    }
+        KaynakTuru.VektorMetin => "Vektör metin",
+        KaynakTuru.VektorGeometri => "Vektör geometri",
+        KaynakTuru.AIGorsel => "AI görsel",
+        _ => kaynak.ToString()
+    };
 }

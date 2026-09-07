@@ -1,10 +1,6 @@
 using InsaatMetrajWeb.Models;
 using UglyToad.PdfPig;
 using System.Text.RegularExpressions;
-using ACadSharp;
-using ACadSharp.IO;
-using ACadSharp.Entities;
-using CSMath;
 
 namespace InsaatMetrajWeb.Services;
 
@@ -300,157 +296,18 @@ public class VeriDeposu
         return sonuclar;
     }
 
-    /// <summary>
-    /// Bir DWG veya DXF dosyasını okuyup, içindeki her katmandaki (layer)
-    /// entity'lerden yapay zekanın karar vermesi için geometrik sinyaller
-    /// çıkarır: kapalılık, çizgi kalınlığı, ortalama segment uzunluğu,
-    /// en/boy oranı, toplam uzunluk/alan. Katman ismiyle sınıflandırma
-    /// YAPMAZ — bu iş kasıtlı olarak AiSiniflandirmaServisi'ne bırakılmıştır,
-    /// çünkü her proje farklı katman isimlendirmesi kullanabiliyor.
-    ///
-    /// NOT: ACadSharp kütüphanesi henüz alpha aşamasında ve bazı entity tipleri
-    /// (HATCH, karmaşık bloklar vb.) tam desteklenmiyor olabilir — bu ilk sürüm
-    /// Line, LwPolyline ve Polyline (2D) varlıklarını kapsıyor. Çizgi kalınlığı
-    /// tespiti LwPolyline'ın ConstantWidth alanına dayanıyor; bu alan boşsa
-    /// kalınlık 0 olarak raporlanır (AI o durumda diğer sinyallere ağırlık verir).
-    /// </summary>
-    public List<CizimKatmanSinyali> CizimSinyalleriniCikar(Stream dosyaStream, string dosyaAdi)
+    /// <summary>Bir çizim analizi (PDF veya DWG) sonucu kullanıcı tarafından onaylandığında çağrılır — projeye metraj kalemi ekler.</summary>
+    public void OdaAnalizSonucunuOnayla(Proje proje, CizimAnalizSonucu sonuc, Poz poz)
     {
-        CadDocument doc = dosyaAdi.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
-            ? DxfReader.Read(dosyaStream)
-            : DwgReader.Read(dosyaStream);
-
-        var modelSpace = doc.BlockRecords["*Model_Space"];
-
-        var katmanGruplari = new Dictionary<string, (
-            int adet, decimal uzunluk, decimal alan, List<double> segmentUzunluklari,
-            List<double> kalinliklar, double minX, double minY, double maxX, double maxY)>();
-
-        void NoktayiSinirlaraKat(ref (int adet, decimal uzunluk, decimal alan, List<double> segmentUzunluklari, List<double> kalinliklar, double minX, double minY, double maxX, double maxY) veri, double x, double y)
-        {
-            veri.minX = Math.Min(veri.minX, x); veri.maxX = Math.Max(veri.maxX, x);
-            veri.minY = Math.Min(veri.minY, y); veri.maxY = Math.Max(veri.maxY, y);
-        }
-
-        foreach (var entity in modelSpace.Entities)
-        {
-            var katmanAdi = entity.Layer?.Name ?? "0";
-            if (!katmanGruplari.ContainsKey(katmanAdi))
-                katmanGruplari[katmanAdi] = (0, 0m, 0m, new List<double>(), new List<double>(),
-                    double.MaxValue, double.MaxValue, double.MinValue, double.MinValue);
-
-            var veri = katmanGruplari[katmanAdi];
-            veri.adet++;
-
-            switch (entity)
-            {
-                case Line line:
-                    var segUzunluk = Mesafe(line.StartPoint, line.EndPoint);
-                    veri.uzunluk += (decimal)segUzunluk;
-                    veri.segmentUzunluklari.Add(segUzunluk);
-                    NoktayiSinirlaraKat(ref veri, line.StartPoint.X, line.StartPoint.Y);
-                    NoktayiSinirlaraKat(ref veri, line.EndPoint.X, line.EndPoint.Y);
-                    break;
-
-                case LwPolyline lw:
-                    var lwNoktalar = lw.Vertices.Select(v => ((double)v.Location.X, (double)v.Location.Y)).ToList();
-                    veri.uzunluk += (decimal)PolylineUzunluk(lwNoktalar, lw.IsClosed, veri.segmentUzunluklari);
-                    if (lw.IsClosed) veri.alan += (decimal)PolylineAlan(lwNoktalar);
-                    foreach (var (x, y) in lwNoktalar) NoktayiSinirlaraKat(ref veri, x, y);
-                    // ConstantWidth genelde çizim kalınlığı (duvar kalınlığı) sinyali verir.
-                    if (lw.ConstantWidth > 0) veri.kalinliklar.Add(lw.ConstantWidth);
-                    break;
-
-                case Polyline2D pl:
-                    var plNoktalar = pl.Vertices.Select(v => ((double)v.Location.X, (double)v.Location.Y)).ToList();
-                    veri.uzunluk += (decimal)PolylineUzunluk(plNoktalar, pl.IsClosed, veri.segmentUzunluklari);
-                    if (pl.IsClosed) veri.alan += (decimal)PolylineAlan(plNoktalar);
-                    foreach (var (x, y) in plNoktalar) NoktayiSinirlaraKat(ref veri, x, y);
-                    break;
-
-                default:
-                    // Desteklenmeyen entity tipi (Circle, Arc, Hatch, Block Insert vb.)
-                    break;
-            }
-
-            katmanGruplari[katmanAdi] = veri;
-        }
-
-        var sonuclar = new List<CizimKatmanSinyali>();
-        foreach (var (katmanAdi, veri) in katmanGruplari)
-        {
-            var genislik = Math.Max(veri.maxX - veri.minX, 0);
-            var yukseklik = Math.Max(veri.maxY - veri.minY, 0);
-            var buyukKenar = Math.Max(genislik, yukseklik);
-            var kucukKenar = Math.Max(Math.Min(genislik, yukseklik), 0.001); // sıfıra bölmeyi önle
-
-            sonuclar.Add(new CizimKatmanSinyali
-            {
-                LayerAdi = katmanAdi,
-                EntitySayisi = veri.adet,
-                KapaliMi = veri.alan > 0,
-                OrtSegmentUzunlugu = veri.segmentUzunluklari.Count > 0 ? veri.segmentUzunluklari.Average() : 0,
-                CizgiKalinligi = veri.kalinliklar.Count > 0 ? veri.kalinliklar.Average() : 0,
-                EnBoyOrani = Math.Round(buyukKenar / kucukKenar, 2),
-                ToplamUzunluk = Math.Round((double)veri.uzunluk, 3),
-                ToplamAlan = Math.Round((double)veri.alan, 3)
-            });
-        }
-
-        return sonuclar;
-    }
-
-    /// <summary>AI önerisi kullanıcı tarafından onaylandığında çağrılır — projeye metraj kalemi ekler.</summary>
-    public void CizimOnerisiniOnayla(Proje proje, CizimKatmanSinyali sinyal, Poz poz)
-    {
-        var miktar = poz.Birim == "m2" ? sinyal.ToplamAlan : sinyal.ToplamUzunluk;
         var yeniId = proje.MetrajKalemleri.Count == 0 ? 1 : proje.MetrajKalemleri.Max(k => k.Id) + 1;
+        var katBilgisi = string.IsNullOrWhiteSpace(sonuc.KatAdi) ? "" : $", kat: {sonuc.KatAdi}";
         proje.MetrajKalemleri.Add(new MetrajKalemi
         {
             Id = yeniId,
             Poz = poz,
-            OlcumDetayi = $"AI önerisiyle çizimden alındı — katman: {sinyal.LayerAdi}",
-            Miktar = (decimal)miktar
+            OlcumDetayi = $"AI çizim analiziyle eklendi — oda: {sonuc.OdaAdi}{katBilgisi} ({sonuc.KaynakTuru})",
+            Miktar = sonuc.AlanM2
         });
-    }
-
-    private static double Mesafe(XYZ a, XYZ b) =>
-        Math.Sqrt(Math.Pow(b.X - a.X, 2) + Math.Pow(b.Y - a.Y, 2));
-
-    /// <summary>Toplam uzunluğu döner; segmentUzunluklariTopla verilirse her segmentin uzunluğunu da oraya ekler (ortalama hesaplamak için).</summary>
-    private static double PolylineUzunluk(List<(double x, double y)> noktalar, bool kapali, List<double>? segmentUzunluklariTopla = null)
-    {
-        double toplam = 0;
-        for (int i = 0; i < noktalar.Count - 1; i++)
-        {
-            var (x1, y1) = noktalar[i];
-            var (x2, y2) = noktalar[i + 1];
-            var uzunluk = Math.Sqrt(Math.Pow(x2 - x1, 2) + Math.Pow(y2 - y1, 2));
-            toplam += uzunluk;
-            segmentUzunluklariTopla?.Add(uzunluk);
-        }
-        if (kapali && noktalar.Count > 1)
-        {
-            var (x1, y1) = noktalar[^1];
-            var (x2, y2) = noktalar[0];
-            var uzunluk = Math.Sqrt(Math.Pow(x2 - x1, 2) + Math.Pow(y2 - y1, 2));
-            toplam += uzunluk;
-            segmentUzunluklariTopla?.Add(uzunluk);
-        }
-        return toplam;
-    }
-
-    /// <summary>Shoelace formülü ile kapalı bir poligonun alanını hesaplar.</summary>
-    private static double PolylineAlan(List<(double x, double y)> noktalar)
-    {
-        double toplam = 0;
-        int n = noktalar.Count;
-        for (int i = 0; i < n; i++)
-        {
-            var (x1, y1) = noktalar[i];
-            var (x2, y2) = noktalar[(i + 1) % n];
-            toplam += (x1 * y2) - (x2 * y1);
-        }
-        return Math.Abs(toplam) / 2.0;
+        sonuc.OnaylandiMi = true;
     }
 }
