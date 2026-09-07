@@ -1,6 +1,7 @@
 @page "/proje/{ProjeId:int}/proje-import"
 @inject VeriDeposu Veri
 @inject AiSiniflandirmaServisi AiServisi
+@inject IJSRuntime JS
 
 @if (proje == null)
 {
@@ -29,9 +30,14 @@ else
         eşleşmeyen satırlar aşağıda ayrıca listelenir, hiçbiri sessizce atlanmaz.
     </p>
 
-    <div class="form-satir">
-        <label>Dosya:</label>
-        <InputFile OnChange="DosyaYuklendi" accept=".csv,.txt,.pdf,.dwg,.dxf" />
+    <div class="dropzone" id="proje-import-dropzone">
+        <div class="dropzone-content">
+            <div class="dropzone-icon">⇩</div>
+            <div class="dropzone-title">Dosyayı buraya sürükleyip bırakın</div>
+            <span class="dropzone-sub">veya seçmek için tıklayın</span>
+            <div class="dropzone-formats">CSV · PDF · DWG · DXF</div>
+        </div>
+        <InputFile OnChange="DosyaYuklendi" accept=".csv,.txt,.pdf,.dwg,.dxf" class="dropzone-input" />
     </div>
 
     @if (isleniyor)
@@ -138,6 +144,14 @@ else
     protected override void OnParametersSet()
     {
         proje = Veri.ProjeBul(ProjeId);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("dropzoneVisual", "proje-import-dropzone");
+        }
     }
 
     private async Task DosyaYuklendi(InputFileChangeEventArgs e)
