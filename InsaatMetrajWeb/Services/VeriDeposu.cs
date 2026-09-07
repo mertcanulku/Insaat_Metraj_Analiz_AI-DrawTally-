@@ -1,4 +1,6 @@
+using InsaatMetrajWeb.Data;
 using InsaatMetrajWeb.Models;
+using Microsoft.EntityFrameworkCore;
 using UglyToad.PdfPig;
 using System.Text.RegularExpressions;
 using ACadSharp;
@@ -9,20 +11,21 @@ using CSMath;
 namespace InsaatMetrajWeb.Services;
 
 /// <summary>
-/// Demo amaçlı in-memory veri deposu. Gerçek üründe bu sınıfın yerini
-/// bir veritabanı (EF Core + PostgreSQL/SQL Server) alacak, ama arayüz
-/// katmanı (Razor sayfaları) bu servise bağlı kalacağı için değişiklik
-/// sadece bu sınıfın içinde kalır.
+/// Poz/Rayiç/Alias kütüphanesi tüm kullanıcılar arasında ortak olduğu için bellekte tutulur
+/// (demo amaçlı sabit veri). Projeler ve metraj kalemleri ise kullanıcıya özel olduğundan
+/// veritabanında (ApplicationDbContext) saklanır — bkz. ProjeBul, ProjeleriListele, ProjeEkle.
 /// </summary>
 public class VeriDeposu
 {
+    private readonly ApplicationDbContext _db;
+
     public List<Rayic> Rayicler { get; } = new();
     public List<Poz> Pozlar { get; } = new();
     public List<Alias> Aliaslar { get; } = new();
-    public List<Proje> Projeler { get; } = new();
 
-    public VeriDeposu()
+    public VeriDeposu(ApplicationDbContext db)
     {
+        _db = db;
         // --- Rayiçler (ÇŞB 2026 örnek fiyatlar) ---
         var hazirBeton = new Rayic { Id = 1, PozKodu = "10.130.1310", Ad = "Hazır beton C12/15", Birim = "m3", Kategori = "malzeme", Fiyat = 2650m, GecerlilikTarihi = new DateOnly(2026, 9, 1) };
         var betonPompasi = new Rayic { Id = 2, PozKodu = "10.500.2001", Ad = "Beton pompası (saat)", Birim = "saat", Kategori = "makine", Fiyat = 1450m, GecerlilikTarihi = new DateOnly(2026, 9, 1) };
@@ -84,41 +87,52 @@ public class VeriDeposu
             new Alias { Id = 3, PozId = demirPozu.Id, AliasMetin = "demir iscilik" },
             new Alias { Id = 4, PozId = duvarPozu.Id, AliasMetin = "tugla duvar" },
         });
-
-        // --- Örnek proje ---
-        var proje = new Proje { Id = 1, Ad = "Örnek Konut Projesi - A Blok" };
-        proje.MetrajKalemleri.Add(new MetrajKalemi
-        {
-            Id = 1,
-            Poz = betonPozu,
-            OlcumDetayi = "Temel radye: 12.00m x 8.00m x 0.30m",
-            Miktar = 12.00m * 8.00m * 0.30m
-        });
-        Projeler.Add(proje);
-
-        var proje2 = new Proje { Id = 2, Ad = "Ticari Ofis Binası - Kaba İnşaat" };
-        proje2.MetrajKalemleri.Add(new MetrajKalemi
-        {
-            Id = 1,
-            Poz = duvarPozu,
-            OlcumDetayi = "Zemin kat dış cephe duvarı",
-            Miktar = 210.5m
-        });
-        Projeler.Add(proje2);
-
-        var proje3 = new Proje { Id = 3, Ad = "Villa Projesi - Isıköy" };
-        Projeler.Add(proje3); // henüz metraj kalemi girilmemiş yeni proje örneği
     }
 
-    public Proje? ProjeBul(int id) => Projeler.FirstOrDefault(p => p.Id == id);
-
-    public Proje ProjeEkle(string ad)
+    /// <summary>Bir kullanıcının tüm projelerini (en yeni önce) listeler.</summary>
+    public async Task<List<Proje>> ProjeleriListele(string sahipId)
     {
-        var yeniId = Projeler.Count == 0 ? 1 : Projeler.Max(p => p.Id) + 1;
-        var yeniProje = new Proje { Id = yeniId, Ad = ad };
-        Projeler.Add(yeniProje);
-        return yeniProje;
+        var kayitlar = await _db.Projeler
+            .Where(p => p.SahipId == sahipId)
+            .Include(p => p.MetrajKalemleri)
+            .OrderByDescending(p => p.Id)
+            .ToListAsync();
+
+        return kayitlar.Select(KaydiProjeyeCevir).ToList();
     }
+
+    /// <summary>Projeyi sadece belirtilen kullanıcıya aitse döner — başkasının projesine erişimi engeller.</summary>
+    public async Task<Proje?> ProjeBul(string sahipId, int id)
+    {
+        var kayit = await _db.Projeler
+            .Include(p => p.MetrajKalemleri)
+            .FirstOrDefaultAsync(p => p.Id == id && p.SahipId == sahipId);
+
+        return kayit == null ? null : KaydiProjeyeCevir(kayit);
+    }
+
+    public async Task<Proje> ProjeEkle(string sahipId, string ad)
+    {
+        var kayit = new ProjeKaydi { Ad = ad, SahipId = sahipId };
+        _db.Projeler.Add(kayit);
+        await _db.SaveChangesAsync();
+        return KaydiProjeyeCevir(kayit);
+    }
+
+    private Proje KaydiProjeyeCevir(ProjeKaydi kayit) => new()
+    {
+        Id = kayit.Id,
+        Ad = kayit.Ad,
+        MetrajKalemleri = kayit.MetrajKalemleri
+            .Select(k => PozIdIleBul(k.PozId) is { } poz
+                ? new MetrajKalemi { Id = k.Id, Poz = poz, OlcumDetayi = k.OlcumDetayi, Miktar = k.Miktar }
+                : null)
+            .Where(k => k != null)
+            .Select(k => k!)
+            .ToList()
+    };
+
+    private Poz? PozIdIleBul(int id) => Pozlar.FirstOrDefault(p => p.Id == id);
 
     /// <summary>
     /// Serbest metin ile poz arar: önce resmi poz koduna, sonra alias tablosuna,
@@ -145,7 +159,7 @@ public class VeriDeposu
     /// Her satır için sonuç (başarılı/başarısız + sebep) döner, böylece kullanıcı
     /// hangi satırların eşleşmediğini görüp elle düzeltebilir.
     /// </summary>
-    public List<ImportSonucSatiri> ProjeyeCsvImportEt(Proje proje, string csvIcerik)
+    public async Task<List<ImportSonucSatiri>> ProjeyeCsvImportEt(Proje proje, string csvIcerik)
     {
         var sonuclar = new List<ImportSonucSatiri>();
         var satirlar = csvIcerik.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -191,11 +205,10 @@ public class VeriDeposu
                 continue;
             }
 
-            var yeniId = proje.MetrajKalemleri.Count == 0 ? 1 : proje.MetrajKalemleri.Max(k => k.Id) + 1;
-            proje.MetrajKalemleri.Add(new MetrajKalemi
+            _db.MetrajKalemleri.Add(new MetrajKalemiKaydi
             {
-                Id = yeniId,
-                Poz = eslesenPoz,
+                ProjeKaydiId = proje.Id,
+                PozId = eslesenPoz.Id,
                 OlcumDetayi = olcumDetayi,
                 Miktar = miktar
             });
@@ -206,6 +219,7 @@ public class VeriDeposu
             sonuclar.Add(sonuc);
         }
 
+        await _db.SaveChangesAsync();
         return sonuclar;
     }
 
@@ -219,7 +233,7 @@ public class VeriDeposu
     /// NOT: Taranmış (resim) PDF'lerde metin katmanı olmadığı için bu yöntem çalışmaz —
     /// o durum için ayrıca OCR (örn. Tesseract) entegrasyonu gerekir, bu demo'ya dahil değil.
     /// </summary>
-    public List<ImportSonucSatiri> ProjeyePdfImportEt(Proje proje, Stream pdfStream)
+    public async Task<List<ImportSonucSatiri>> ProjeyePdfImportEt(Proje proje, Stream pdfStream)
     {
         var sonuclar = new List<ImportSonucSatiri>();
         var pozKoduDeseni = new Regex(@"\d{2}\.\d{3}\.\d{4}");
@@ -281,11 +295,10 @@ public class VeriDeposu
                 if (kodEslesme.Success) olcumDetayi = olcumDetayi.Replace(kodEslesme.Value, "").Trim();
                 olcumDetayi = olcumDetayi.Replace(miktarEslesme.Value, "").Trim(' ', '-', ':', ';');
 
-                var yeniId = proje.MetrajKalemleri.Count == 0 ? 1 : proje.MetrajKalemleri.Max(k => k.Id) + 1;
-                proje.MetrajKalemleri.Add(new MetrajKalemi
+                _db.MetrajKalemleri.Add(new MetrajKalemiKaydi
                 {
-                    Id = yeniId,
-                    Poz = eslesenPoz,
+                    ProjeKaydiId = proje.Id,
+                    PozId = eslesenPoz.Id,
                     OlcumDetayi = olcumDetayi.Length > 0 ? olcumDetayi : "(PDF'den otomatik alındı)",
                     Miktar = miktar
                 });
@@ -297,6 +310,7 @@ public class VeriDeposu
             }
         }
 
+        await _db.SaveChangesAsync();
         return sonuclar;
     }
 
@@ -401,17 +415,30 @@ public class VeriDeposu
     }
 
     /// <summary>AI önerisi kullanıcı tarafından onaylandığında çağrılır — projeye metraj kalemi ekler.</summary>
-    public void CizimOnerisiniOnayla(Proje proje, CizimKatmanSinyali sinyal, Poz poz)
+    public async Task CizimOnerisiniOnayla(Proje proje, CizimKatmanSinyali sinyal, Poz poz)
     {
         var miktar = poz.Birim == "m2" ? sinyal.ToplamAlan : sinyal.ToplamUzunluk;
-        var yeniId = proje.MetrajKalemleri.Count == 0 ? 1 : proje.MetrajKalemleri.Max(k => k.Id) + 1;
-        proje.MetrajKalemleri.Add(new MetrajKalemi
+        _db.MetrajKalemleri.Add(new MetrajKalemiKaydi
         {
-            Id = yeniId,
-            Poz = poz,
+            ProjeKaydiId = proje.Id,
+            PozId = poz.Id,
             OlcumDetayi = $"AI önerisiyle çizimden alındı — katman: {sinyal.LayerAdi}",
             Miktar = (decimal)miktar
         });
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>Metraj Girişi sayfasından elle eklenen bir kalemi projeye kaydeder.</summary>
+    public async Task MetrajKalemiEkle(Proje proje, Poz poz, string olcumDetayi, decimal miktar)
+    {
+        _db.MetrajKalemleri.Add(new MetrajKalemiKaydi
+        {
+            ProjeKaydiId = proje.Id,
+            PozId = poz.Id,
+            OlcumDetayi = olcumDetayi,
+            Miktar = miktar
+        });
+        await _db.SaveChangesAsync();
     }
 
     private static double Mesafe(XYZ a, XYZ b) =>

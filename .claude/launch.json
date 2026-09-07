@@ -5,7 +5,8 @@
       "name": "insaat-metraj-web",
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "InsaatMetrajWeb"],
-      "port": 5000
+      "port": 5000,
+      "autoPort": true
     }
   ]
 }

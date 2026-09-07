@@ -1,5 +1,8 @@
 @page "/proje/{ProjeId:int}"
+@rendermode InteractiveServer
+@attribute [Authorize]
 @inject VeriDeposu Veri
+@inject AuthenticationStateProvider AuthProvider
 
 @if (proje == null)
 {
@@ -62,8 +65,9 @@ else
 
     private Proje? proje;
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
-        proje = Veri.ProjeBul(ProjeId);
+        var sahipId = await AuthProvider.GetUserIdAsync();
+        proje = await Veri.ProjeBul(sahipId, ProjeId);
     }
 }

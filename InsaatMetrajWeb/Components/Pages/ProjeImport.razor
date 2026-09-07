@@ -1,7 +1,10 @@
 @page "/proje/{ProjeId:int}/proje-import"
+@rendermode InteractiveServer
+@attribute [Authorize]
 @inject VeriDeposu Veri
 @inject AiSiniflandirmaServisi AiServisi
 @inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthProvider
 
 @if (proje == null)
 {
@@ -141,9 +144,10 @@ else
     private List<ImportSonucSatiri> importSonuclari = new();
     private List<CizimAnalizSonucu> cizimSonuclari = new();
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
-        proje = Veri.ProjeBul(ProjeId);
+        var sahipId = await AuthProvider.GetUserIdAsync();
+        proje = await Veri.ProjeBul(sahipId, ProjeId);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -180,7 +184,7 @@ else
                 using var bellekAkisi = new MemoryStream();
                 await stream.CopyToAsync(bellekAkisi);
                 bellekAkisi.Position = 0;
-                importSonuclari = Veri.ProjeyePdfImportEt(proje, bellekAkisi);
+                importSonuclari = await Veri.ProjeyePdfImportEt(proje, bellekAkisi);
 
                 if (importSonuclari.Count == 0)
                 {
@@ -194,7 +198,7 @@ else
                 using var stream = e.File.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024); // 5MB sınır
                 using var reader = new StreamReader(stream);
                 var icerik = await reader.ReadToEndAsync();
-                importSonuclari = Veri.ProjeyeCsvImportEt(proje, icerik);
+                importSonuclari = await Veri.ProjeyeCsvImportEt(proje, icerik);
             }
         }
         catch (Exception ex)
@@ -227,7 +231,7 @@ else
         }
     }
 
-    private void CizimOnerisiOnayla(int index)
+    private async Task CizimOnerisiOnayla(int index)
     {
         if (proje == null) return;
         var s = cizimSonuclari[index];
@@ -235,7 +239,7 @@ else
         var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.Oneri.PozId);
         if (poz == null) return;
 
-        Veri.CizimOnerisiniOnayla(proje, s.Sinyal, poz);
+        await Veri.CizimOnerisiniOnayla(proje, s.Sinyal, poz);
         s.Eklendi = true;
     }
 }

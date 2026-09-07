@@ -9,6 +9,13 @@
 
   <ItemGroup>
     <!-- PDF'lerden metin çıkarmak için: ücretsiz, açık kaynak (MIT lisanslı) -->
+    <PackageReference Include="MailKit" Version="4.13.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
     <PackageReference Include="PdfPig" Version="0.1.9" />
     <!-- DWG/DXF çizim dosyalarını okumak için: ücretsiz, açık kaynak (MIT lisanslı), alpha aşamasında -->
     <PackageReference Include="ACadSharp" Version="1.4.0-alpha" />

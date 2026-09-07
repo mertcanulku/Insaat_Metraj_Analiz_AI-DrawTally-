@@ -9,6 +9,14 @@
             <NavLink href="" Match="NavLinkMatch.All">Projeler</NavLink>
             <NavLink href="poz-kutuphanesi">Poz Kütüphanesi</NavLink>
         </div>
+        <AuthorizeView>
+            <Authorized>
+                <div class="sidebar-user">
+                    <span class="kullanici-email">@context.User.Identity?.Name</span>
+                    <a href="account/cikis" class="cikis-linki">Çıkış Yap</a>
+                </div>
+            </Authorized>
+        </AuthorizeView>
     </nav>
     <main class="content">
         <div class="sheet">
