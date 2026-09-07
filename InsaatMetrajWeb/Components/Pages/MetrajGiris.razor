@@ -1,0 +1,100 @@
+@page "/proje/{ProjeId:int}/metraj-giris"
+@inject VeriDeposu Veri
+
+@if (proje == null)
+{
+    <p class="hata-mesaj">Proje bulunamadı (id: @ProjeId). <a href="/">Proje listesine dön</a></p>
+}
+else
+{
+    <p><a href="@($"/proje/{ProjeId}")">← @proje.Ad</a></p>
+    <h1>Metraj Girişi</h1>
+    <p>Poz kodu, adı veya kısaltmasını (örn. "beton pompa") yazabilirsin — sistem eşleşen pozu bulur.</p>
+
+    <div class="form-satir">
+        <label>Poz / Kısaltma:</label>
+        <input @bind="pozAramaMetni" placeholder="örn: beton pompa, 15.150.1002, tugla duvar" />
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(pozAramaMetni))
+    {
+        var bulunanPoz = Veri.PozAra(pozAramaMetni);
+        @if (bulunanPoz != null)
+        {
+            <p class="basarili-mesaj">✓ Eşleşti: <strong>@bulunanPoz.PozKodu</strong> — @bulunanPoz.Ad (@bulunanPoz.Birim, birim maliyet: @bulunanPoz.BirimMaliyet().ToString("N2") TL)</p>
+        }
+        else
+        {
+            <p class="hata-mesaj">✗ Eşleşme bulunamadı. Poz kütüphanesindeki kodları veya kısaltmaları kontrol et.</p>
+        }
+    }
+
+    <div class="form-satir">
+        <label>Ölçüm Detayı:</label>
+        <input @bind="olcumDetayi" placeholder="örn: Temel radye 12x8x0.30" />
+    </div>
+
+    <div class="form-satir">
+        <label>Miktar:</label>
+        <input @bind="miktarMetni" placeholder="örn: 28.8" />
+    </div>
+
+    <button @onclick="KalemEkle">Metraj Kalemi Ekle</button>
+
+    @if (!string.IsNullOrEmpty(sonMesaj))
+    {
+        <p class="@(sonBasarili ? "basarili-mesaj" : "hata-mesaj")">@sonMesaj</p>
+    }
+}
+
+@code {
+    [Parameter]
+    public int ProjeId { get; set; }
+
+    private Proje? proje;
+    private string pozAramaMetni = "";
+    private string olcumDetayi = "";
+    private string miktarMetni = "";
+    private string sonMesaj = "";
+    private bool sonBasarili;
+
+    protected override void OnParametersSet()
+    {
+        proje = Veri.ProjeBul(ProjeId);
+    }
+
+    private void KalemEkle()
+    {
+        if (proje == null) return;
+
+        var poz = Veri.PozAra(pozAramaMetni);
+        if (poz == null)
+        {
+            sonMesaj = "Poz eşleşmedi, kalem eklenemedi.";
+            sonBasarili = false;
+            return;
+        }
+
+        if (!decimal.TryParse(miktarMetni.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var miktar))
+        {
+            sonMesaj = "Miktar geçerli bir sayı değil.";
+            sonBasarili = false;
+            return;
+        }
+
+        var yeniId = proje.MetrajKalemleri.Count == 0 ? 1 : proje.MetrajKalemleri.Max(k => k.Id) + 1;
+        proje.MetrajKalemleri.Add(new MetrajKalemi
+        {
+            Id = yeniId,
+            Poz = poz,
+            OlcumDetayi = olcumDetayi,
+            Miktar = miktar
+        });
+
+        sonMesaj = $"Eklendi: {poz.PozKodu} - {miktar:0.000} {poz.Birim}";
+        sonBasarili = true;
+        pozAramaMetni = "";
+        olcumDetayi = "";
+        miktarMetni = "";
+    }
+}

@@ -1,0 +1,27 @@
+@page "/poz-kutuphanesi"
+@inject VeriDeposu Veri
+
+<h1>Poz Kütüphanesi</h1>
+<p>Tüm projelerde ortak kullanılan poz ve analiz kayıtları (ÇŞB rayiç esaslı).</p>
+
+<table class="veri-tablo">
+    <thead>
+        <tr>
+            <th>Poz Kodu</th>
+            <th>Ad</th>
+            <th>Birim</th>
+            <th>Birim Maliyet</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var p in Veri.Pozlar)
+        {
+            <tr>
+                <td>@p.PozKodu</td>
+                <td>@p.Ad</td>
+                <td>@p.Birim</td>
+                <td>@p.BirimMaliyet().ToString("N2")</td>
+            </tr>
+        }
+    </tbody>
+</table>

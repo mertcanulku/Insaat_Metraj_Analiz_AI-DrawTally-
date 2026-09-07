@@ -1,0 +1,139 @@
+@page "/proje/{ProjeId:int}/proje-import"
+@inject VeriDeposu Veri
+
+@if (proje == null)
+{
+    <p class="hata-mesaj">Proje bulunamadı (id: @ProjeId). <a href="/">Proje listesine dön</a></p>
+}
+else
+{
+    <p><a href="@($"/proje/{ProjeId}")">← @proje.Ad</a></p>
+    <h1>Proje Import</h1>
+    <p>İki formatı destekler:</p>
+    <ul>
+        <li>
+            <strong>CSV</strong> — Excel'den ";" ile ayrılmış: <code>PozKoduVeyaKısaltma;OlçümDetayı;Miktar</code><br />
+            Örnek: <code>beton pompa;Perde duvar temeli;15.6</code>
+        </li>
+        <li>
+            <strong>PDF</strong> — dijital (metni seçilebilir) bir metraj/keşif PDF'i. Her satırda bir poz kodu/kısaltma
+            ve satır sonunda bir miktar aranır. <em>Not: taranmış (resim) PDF'lerde çalışmaz, metin katmanı gerekir.</em>
+        </li>
+    </ul>
+    <p>
+        Hangi formatta olursa olsun, poz kodu tam bilinmiyorsa kısaltma/eski kod da (alias tablosu üzerinden) tanınır —
+        eşleşmeyen satırlar aşağıda ayrıca listelenir, hiçbiri sessizce atlanmaz.
+    </p>
+
+    <div class="form-satir">
+        <InputFile OnChange="DosyaYuklendi" accept=".csv,.txt,.pdf" />
+    </div>
+
+    @if (isleniyor)
+    {
+        <p><em>Dosya işleniyor...</em></p>
+    }
+
+    @if (!string.IsNullOrEmpty(genelHataMesaji))
+    {
+        <p class="hata-mesaj">@genelHataMesaji</p>
+    }
+
+    @if (importSonuclari.Count > 0)
+    {
+        var basariliSayisi = importSonuclari.Count(s => s.Basarili);
+        var basarisizSayisi = importSonuclari.Count - basariliSayisi;
+
+        <h3>Import Sonucu (@sonYuklenenFormat): @basariliSayisi başarılı, @basarisizSayisi eşleşmedi</h3>
+
+        <table class="veri-tablo">
+            <thead>
+                <tr>
+                    <th>Satır</th>
+                    <th>Ham Veri</th>
+                    <th>Durum</th>
+                    <th>Mesaj</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in importSonuclari)
+                {
+                    <tr class="@(s.Basarili ? "satir-basarili" : "satir-hatali")">
+                        <td>@s.SatirNo</td>
+                        <td>@s.HamMetin</td>
+                        <td>@(s.Basarili ? "✓ Başarılı" : "✗ Eşleşmedi")</td>
+                        <td>@s.Mesaj</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if (basarisizSayisi > 0)
+        {
+            <p class="hata-mesaj">
+                Eşleşmeyen satırlar için: poz kodunu Poz Kütüphanesi sayfasından kontrol et,
+                veya eksik kısaltmayı geliştirici ekibine bildirip Alias tablosuna eklet.
+            </p>
+        }
+    }
+}
+
+@code {
+    [Parameter]
+    public int ProjeId { get; set; }
+
+    private Proje? proje;
+    private bool isleniyor;
+    private string genelHataMesaji = "";
+    private string sonYuklenenFormat = "";
+    private List<ImportSonucSatiri> importSonuclari = new();
+
+    protected override void OnParametersSet()
+    {
+        proje = Veri.ProjeBul(ProjeId);
+    }
+
+    private async Task DosyaYuklendi(InputFileChangeEventArgs e)
+    {
+        if (proje == null) return;
+
+        isleniyor = true;
+        genelHataMesaji = "";
+        importSonuclari = new();
+        StateHasChanged();
+
+        var dosyaAdi = e.File.Name.ToLowerInvariant();
+
+        try
+        {
+            if (dosyaAdi.EndsWith(".pdf"))
+            {
+                sonYuklenenFormat = "PDF";
+                using var stream = e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 10MB sınır
+                using var bellekAkisi = new MemoryStream();
+                await stream.CopyToAsync(bellekAkisi);
+                bellekAkisi.Position = 0;
+                importSonuclari = Veri.ProjeyePdfImportEt(proje, bellekAkisi);
+
+                if (importSonuclari.Count == 0)
+                {
+                    genelHataMesaji = "PDF'den hiç satır okunamadı — dosya taranmış (resim) bir PDF olabilir, bu durumda metin katmanı olmadığı için otomatik okuma yapılamıyor.";
+                }
+            }
+            else
+            {
+                sonYuklenenFormat = "CSV";
+                using var stream = e.File.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024); // 5MB sınır
+                using var reader = new StreamReader(stream);
+                var icerik = await reader.ReadToEndAsync();
+                importSonuclari = Veri.ProjeyeCsvImportEt(proje, icerik);
+            }
+        }
+        catch (Exception ex)
+        {
+            genelHataMesaji = $"Dosya işlenirken hata oluştu: {ex.Message}";
+        }
+
+        isleniyor = false;
+    }
+}

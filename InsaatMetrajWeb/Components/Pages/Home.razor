@@ -1,0 +1,46 @@
+@page "/"
+@inject VeriDeposu Veri
+@inject NavigationManager Nav
+
+<h1>Projeler</h1>
+<p>Devam etmek istediğin projeyi seç, ya da yeni bir proje oluştur.</p>
+
+<table class="veri-tablo">
+    <thead>
+        <tr>
+            <th>Proje Adı</th>
+            <th>Metraj Kalemi Sayısı</th>
+            <th>Toplam Maliyet</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var p in Veri.Projeler)
+        {
+            <tr>
+                <td>@p.Ad</td>
+                <td>@p.MetrajKalemleri.Count</td>
+                <td>@p.ToplamMaliyet().ToString("N2") TL</td>
+                <td><a href="@($"proje/{p.Id}")">Aç →</a></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<h3>Yeni Proje Oluştur</h3>
+<div class="form-satir">
+    <label>Proje Adı:</label>
+    <input @bind="yeniProjeAdi" placeholder="örn: Sahil Sitesi - B Blok" />
+</div>
+<button @onclick="YeniProjeOlustur">Proje Oluştur</button>
+
+@code {
+    private string yeniProjeAdi = "";
+
+    private void YeniProjeOlustur()
+    {
+        if (string.IsNullOrWhiteSpace(yeniProjeAdi)) return;
+        var yeniProje = Veri.ProjeEkle(yeniProjeAdi.Trim());
+        Nav.NavigateTo($"proje/{yeniProje.Id}");
+    }
+}

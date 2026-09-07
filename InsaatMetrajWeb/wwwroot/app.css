@@ -1,0 +1,218 @@
+/* ==========================================================================
+   Metraj & Hakediş — teknik çizim/keşif cetveli estetiğinden ilham alan tema
+   ========================================================================== */
+
+:root {
+    --paper: #EEF1F0;
+    --sheet: #FFFFFF;
+    --ink: #16242B;
+    --ink-soft: #4B5A61;
+    --line: #C7D0CC;
+    --line-soft: #DEE4E1;
+    --blueprint: #16242B;
+    --blueprint-ink: #D8E4EA;
+    --accent: #1F5F8B;
+    --accent-soft: #E3EDF2;
+    --warn: #C4551C;
+    --warn-soft: #FBEAE0;
+    --ok: #3F7A52;
+    --ok-soft: #E7F1E9;
+    --radius: 3px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: "IBM Plex Sans", Arial, sans-serif;
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+/* --- Genel yapı --- */
+.app-shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    background: var(--blueprint);
+    color: var(--blueprint-ink);
+    display: flex;
+    flex-direction: column;
+    padding: 28px 22px;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 34px; }
+.brand-mark {
+    width: 34px; height: 34px;
+    border: 1px solid var(--blueprint-ink);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+.brand-name { font-weight: 600; font-size: 0.98rem; letter-spacing: 0.01em; }
+.brand-sub { font-size: 0.78rem; color: #93A6AE; margin-top: 2px; }
+
+.nav-links { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.nav-links a {
+    color: #B9C7CC;
+    text-decoration: none;
+    padding: 10px 10px 10px 14px;
+    font-size: 0.92rem;
+    border-left: 2px solid transparent;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.nav-links a:hover { color: var(--blueprint-ink); background: rgba(255,255,255,0.04); }
+.nav-links a.active {
+    color: var(--blueprint-ink);
+    border-left: 2px solid var(--accent);
+    background: rgba(255,255,255,0.06);
+    font-weight: 500;
+}
+
+.sidebar-foot {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: #6E8088;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    padding-top: 14px;
+    margin-top: 14px;
+}
+
+.content { flex: 1; padding: 40px; min-width: 0; }
+
+.sheet {
+    background: var(--sheet);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 36px 42px;
+    max-width: 1100px;
+}
+
+/* --- Başlıklar: teknik çizimlerin ölçü çizgisi (dimension line) motifi --- */
+h1, h2, h3 {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    color: var(--ink);
+    margin-top: 0;
+}
+
+h1 { font-size: 1.55rem; margin-bottom: 14px; }
+h3 { font-size: 1.1rem; margin-top: 30px; margin-bottom: 12px; }
+
+h1::after, h3::after {
+    content: "";
+    display: block;
+    height: 7px;
+    margin-top: 8px;
+    background-image:
+        linear-gradient(to right, var(--ink) 0 1px, transparent 1px),
+        linear-gradient(to right, transparent calc(100% - 1px), var(--ink) calc(100% - 1px));
+    background-position: left top, left top;
+    background-size: 100% 7px, 100% 7px;
+    background-repeat: no-repeat;
+    border-bottom: 1px solid var(--line);
+}
+h3::after { height: 5px; background-size: 100% 5px, 100% 5px; }
+
+p { color: var(--ink-soft); max-width: 72ch; }
+
+code {
+    font-family: "IBM Plex Mono", monospace;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 0.88em;
+}
+
+/* --- Tablolar: keşif cetveli görünümü, rakamlar monospace --- */
+.veri-tablo {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 14px 0 22px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.86rem;
+}
+.veri-tablo th, .veri-tablo td {
+    border-bottom: 1px solid var(--line-soft);
+    padding: 9px 12px;
+    text-align: left;
+}
+.veri-tablo th {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--ink);
+    white-space: nowrap;
+}
+.veri-tablo tfoot td {
+    border-top: 1px solid var(--ink);
+    border-bottom: none;
+    padding-top: 12px;
+}
+.veri-tablo tbody tr:hover { background: var(--paper); }
+
+.satir-basarili { background: var(--ok-soft); }
+.satir-basarili:hover { background: #DCEBDF !important; }
+.satir-hatali { background: var(--warn-soft); }
+.satir-hatali:hover { background: #F6DCC9 !important; }
+
+/* --- Formlar --- */
+.form-satir { margin: 14px 0; display: flex; align-items: center; gap: 14px; }
+.form-satir label { font-weight: 500; font-size: 0.88rem; width: 150px; flex-shrink: 0; }
+.form-satir input {
+    font-family: "IBM Plex Mono", monospace;
+    padding: 8px 10px;
+    width: 340px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--paper);
+    color: var(--ink);
+}
+.form-satir input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--sheet);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+button {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 10px 20px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    letter-spacing: 0.01em;
+}
+button:hover { background: #184A6E; }
+
+/* --- Mesaj satırları --- */
+.basarili-mesaj { color: var(--ok); font-weight: 600; font-size: 0.9rem; }
+.hata-mesaj { color: var(--warn); font-weight: 600; font-size: 0.9rem; }
+p.hata-mesaj, p.basarili-mesaj { max-width: none; }
+
+ul { color: var(--ink-soft); padding-left: 20px; }
+ul li { margin-bottom: 6px; }
+
+.proje-aksiyonlar { display: flex; gap: 10px; margin: 16px 0 8px; flex-wrap: wrap; }
+.proje-aksiyonlar a {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    padding: 8px 14px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+}
+.proje-aksiyonlar a:hover { background: var(--accent-soft); }

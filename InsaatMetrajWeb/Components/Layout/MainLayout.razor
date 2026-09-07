@@ -1,0 +1,22 @@
+@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <nav class="sidebar">
+        <div class="brand">
+            <span class="brand-mark">M</span>
+            <div>
+                <div class="brand-name">Metraj &amp; Hakediş</div>
+                <div class="brand-sub">Keşif Analiz Sistemi</div>
+            </div>
+        </div>
+        <div class="nav-links">
+            <NavLink href="" Match="NavLinkMatch.All">Projeler</NavLink>
+            <NavLink href="poz-kutuphanesi">Poz Kütüphanesi</NavLink>
+        </div>
+    </nav>
+    <main class="content">
+        <div class="sheet">
+            @Body
+        </div>
+    </main>
+</div>

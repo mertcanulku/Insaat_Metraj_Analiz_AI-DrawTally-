@@ -1,0 +1,70 @@
+@page "/proje/{ProjeId:int}"
+@inject VeriDeposu Veri
+
+@if (proje == null)
+{
+    <p class="hata-mesaj">Proje bulunamadı (id: @ProjeId). <a href="/">Proje listesine dön</a></p>
+}
+else
+{
+    <p><a href="/">← Proje listesi</a></p>
+    <h1>@proje.Ad</h1>
+
+    <div class="proje-aksiyonlar">
+        <a href="@($"proje/{ProjeId}/metraj-giris")">+ Metraj Girişi</a>
+        <a href="@($"proje/{ProjeId}/proje-import")">+ CSV/PDF Import</a>
+        <a href="@($"proje/{ProjeId}/cizim-import")">+ Çizim Import (DWG/DXF)</a>
+    </div>
+
+    <h3>Keşif Özeti</h3>
+    @if (proje.MetrajKalemleri.Count == 0)
+    {
+        <p><em>Bu projede henüz metraj kalemi yok. Yukarıdaki seçeneklerden biriyle ekleyebilirsin.</em></p>
+    }
+    else
+    {
+        <table class="veri-tablo">
+            <thead>
+                <tr>
+                    <th>Poz Kodu</th>
+                    <th>Poz Adı</th>
+                    <th>Ölçüm Detayı</th>
+                    <th>Miktar</th>
+                    <th>Birim Fiyat</th>
+                    <th>Tutar</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var k in proje.MetrajKalemleri)
+                {
+                    <tr>
+                        <td>@k.Poz.PozKodu</td>
+                        <td>@k.Poz.Ad</td>
+                        <td>@k.OlcumDetayi</td>
+                        <td>@k.Miktar.ToString("0.000")</td>
+                        <td>@k.Poz.BirimMaliyet().ToString("N2")</td>
+                        <td>@k.ToplamMaliyet().ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="5" style="text-align:right"><strong>GENEL TOPLAM</strong></td>
+                    <td><strong>@proje.ToplamMaliyet().ToString("N2") TL</strong></td>
+                </tr>
+            </tfoot>
+        </table>
+    }
+}
+
+@code {
+    [Parameter]
+    public int ProjeId { get; set; }
+
+    private Proje? proje;
+
+    protected override void OnParametersSet()
+    {
+        proje = Veri.ProjeBul(ProjeId);
+    }
+}
