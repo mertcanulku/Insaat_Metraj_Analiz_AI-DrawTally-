@@ -1,5 +1,6 @@
 @page "/proje/{ProjeId:int}/proje-import"
 @inject VeriDeposu Veri
+@inject AiSiniflandirmaServisi AiServisi
 
 @if (proje == null)
 {
@@ -9,29 +10,33 @@ else
 {
     <p><a href="@($"/proje/{ProjeId}")">← @proje.Ad</a></p>
     <h1>Proje Import</h1>
-    <p>İki formatı destekler:</p>
+    <p>Tek bir yükleme alanından dört formatı destekler:</p>
     <ul>
         <li>
             <strong>CSV</strong> — Excel'den ";" ile ayrılmış: <code>PozKoduVeyaKısaltma;OlçümDetayı;Miktar</code><br />
             Örnek: <code>beton pompa;Perde duvar temeli;15.6</code>
         </li>
         <li>
-            <strong>PDF</strong> — dijital (metni seçilebilir) bir metraj/keşif PDF'i. Her satırda bir poz kodu/kısaltma
-            ve satır sonunda bir miktar aranır. <em>Not: taranmış (resim) PDF'lerde çalışmaz, metin katmanı gerekir.</em>
+            <strong>PDF</strong> — dijital (metni seçilebilir) bir metraj/keşif PDF'i. <em>Taranmış (resim) PDF'lerde çalışmaz.</em>
+        </li>
+        <li>
+            <strong>DWG / DXF</strong> — mimari/statik çizim dosyası. Katmanların geometrisi çıkarılıp yapay zekaya
+            hangi poza karşılık geldiği sorulur; öneriler elle onaylanana kadar projeye eklenmez.
         </li>
     </ul>
     <p>
-        Hangi formatta olursa olsun, poz kodu tam bilinmiyorsa kısaltma/eski kod da (alias tablosu üzerinden) tanınır —
+        CSV/PDF'te poz kodu tam bilinmiyorsa kısaltma/eski kod da (alias tablosu üzerinden) tanınır —
         eşleşmeyen satırlar aşağıda ayrıca listelenir, hiçbiri sessizce atlanmaz.
     </p>
 
     <div class="form-satir">
-        <InputFile OnChange="DosyaYuklendi" accept=".csv,.txt,.pdf" />
+        <label>Dosya:</label>
+        <InputFile OnChange="DosyaYuklendi" accept=".csv,.txt,.pdf,.dwg,.dxf" />
     </div>
 
     @if (isleniyor)
     {
-        <p><em>Dosya işleniyor...</em></p>
+        <p><em>@isleniyorMesaji</em></p>
     }
 
     @if (!string.IsNullOrEmpty(genelHataMesaji))
@@ -76,6 +81,46 @@ else
             </p>
         }
     }
+
+    @if (cizimSonuclari.Count > 0)
+    {
+        <h3>Yapay Zeka Önerileri (Çizim)</h3>
+        <table class="veri-tablo">
+            <thead>
+                <tr>
+                    <th>Katman</th>
+                    <th>Önerilen Poz</th>
+                    <th>Gerekçe</th>
+                    <th>Güven / Model</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < cizimSonuclari.Count; i++)
+                {
+                    var index = i;
+                    var s = cizimSonuclari[index];
+                    var poz = s.Oneri.PozId.HasValue ? Veri.Pozlar.FirstOrDefault(p => p.Id == s.Oneri.PozId) : null;
+                    <tr class="@(s.Eklendi ? "satir-basarili" : (poz == null ? "satir-hatali" : ""))">
+                        <td>@s.Sinyal.LayerAdi</td>
+                        <td>@(poz != null ? $"{poz.PozKodu} — {poz.Ad}" : "—")</td>
+                        <td style="font-size:0.85rem">@s.Oneri.Gerekce</td>
+                        <td>%@s.Oneri.Guven — @s.Oneri.KullanilanModel</td>
+                        <td>
+                            @if (s.Eklendi)
+                            {
+                                <span>✓ Eklendi</span>
+                            }
+                            else if (poz != null)
+                            {
+                                <button @onclick="() => CizimOnerisiOnayla(index)">Onayla ve Ekle</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
 }
 
 @code {
@@ -84,9 +129,11 @@ else
 
     private Proje? proje;
     private bool isleniyor;
+    private string isleniyorMesaji = "";
     private string genelHataMesaji = "";
     private string sonYuklenenFormat = "";
     private List<ImportSonucSatiri> importSonuclari = new();
+    private List<CizimAnalizSonucu> cizimSonuclari = new();
 
     protected override void OnParametersSet()
     {
@@ -100,15 +147,21 @@ else
         isleniyor = true;
         genelHataMesaji = "";
         importSonuclari = new();
+        cizimSonuclari = new();
         StateHasChanged();
 
         var dosyaAdi = e.File.Name.ToLowerInvariant();
 
         try
         {
-            if (dosyaAdi.EndsWith(".pdf"))
+            if (dosyaAdi.EndsWith(".dwg") || dosyaAdi.EndsWith(".dxf"))
+            {
+                await CizimDosyasiIsle(e);
+            }
+            else if (dosyaAdi.EndsWith(".pdf"))
             {
                 sonYuklenenFormat = "PDF";
+                isleniyorMesaji = "PDF işleniyor...";
                 using var stream = e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 10MB sınır
                 using var bellekAkisi = new MemoryStream();
                 await stream.CopyToAsync(bellekAkisi);
@@ -123,6 +176,7 @@ else
             else
             {
                 sonYuklenenFormat = "CSV";
+                isleniyorMesaji = "CSV işleniyor...";
                 using var stream = e.File.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024); // 5MB sınır
                 using var reader = new StreamReader(stream);
                 var icerik = await reader.ReadToEndAsync();
@@ -135,5 +189,39 @@ else
         }
 
         isleniyor = false;
+    }
+
+    private async Task CizimDosyasiIsle(InputFileChangeEventArgs e)
+    {
+        isleniyorMesaji = "Çizim okunuyor, geometrik sinyaller çıkarılıyor...";
+        StateHasChanged();
+
+        using var stream = e.File.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024); // 50MB sınır
+        using var bellekAkisi = new MemoryStream();
+        await stream.CopyToAsync(bellekAkisi);
+        bellekAkisi.Position = 0;
+
+        var sinyaller = Veri.CizimSinyalleriniCikar(bellekAkisi, e.File.Name);
+
+        for (int i = 0; i < sinyaller.Count; i++)
+        {
+            isleniyorMesaji = $"Yapay zeka katmanları değerlendiriyor... ({i + 1}/{sinyaller.Count})";
+            StateHasChanged();
+
+            var oneri = await AiServisi.SiniflandirAsync(sinyaller[i], Veri.Pozlar);
+            cizimSonuclari.Add(new CizimAnalizSonucu { Sinyal = sinyaller[i], Oneri = oneri });
+        }
+    }
+
+    private void CizimOnerisiOnayla(int index)
+    {
+        if (proje == null) return;
+        var s = cizimSonuclari[index];
+        if (!s.Oneri.PozId.HasValue) return;
+        var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.Oneri.PozId);
+        if (poz == null) return;
+
+        Veri.CizimOnerisiniOnayla(proje, s.Sinyal, poz);
+        s.Eklendi = true;
     }
 }
