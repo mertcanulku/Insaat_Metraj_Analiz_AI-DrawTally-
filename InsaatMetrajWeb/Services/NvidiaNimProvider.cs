@@ -8,9 +8,9 @@ namespace InsaatMetrajWeb.Services;
 /// IAiClassificationProvider'ın NVIDIA NIM (OpenAI-uyumlu) implementasyonu.
 /// https://integrate.api.nvidia.com/v1/chat/completions kullanır.
 ///
-/// NOT: Varsayılan modeller (Llama 3.1 Instruct) metin-only'dir — görsel sınıflandırma
-/// desteklenmiyor, bkz. GorselSiniflandirAsync. Vizyon desteği gerekiyorsa appsettings
-/// üzerinden vizyon yeteneği olan bir NIM modeline geçirilebilir.
+/// Varsayılan model (meta/llama-3.2-11b-vision-instruct) vizyon destekli olduğundan
+/// hem metin hem görsel sınıflandırma OpenAI'nin image_url (base64 data URI) formatıyla
+/// aynı endpoint üzerinden yapılır.
 ///
 /// KURULUM: appsettings.json'a veya (tercihen) kullanıcı gizli dizinine
 /// (dotnet user-secrets) şu anahtarı eklemen gerekiyor:
@@ -39,22 +39,32 @@ public class NvidiaNimProvider : IAiClassificationProvider
     }
 
     public Task<OdaYapilandirmaSonucu> MetinSiniflandirAsync(string model, string sistemPrompt, string kullaniciMetni)
-        => IstekGonderVeYorumlaAsync(model, sistemPrompt, kullaniciMetni);
+    {
+        object kullaniciIcerik = kullaniciMetni;
+        return IstekGonderVeYorumlaAsync(model, sistemPrompt, kullaniciIcerik);
+    }
 
     public Task<OdaYapilandirmaSonucu> GorselSiniflandirAsync(string model, string sistemPrompt, string kullaniciMetni, byte[] pngGorsel)
-        => throw new NotSupportedException(
-            $"NVIDIA NIM sağlayıcısının varsayılan modeli ({model}) görsel girdiyi desteklemiyor — vizyon yeteneği olan bir modele geçmeden görselden oda çıkarımı yapılamaz.");
+    {
+        var base64Gorsel = Convert.ToBase64String(pngGorsel);
+        object kullaniciIcerik = new object[]
+        {
+            new { type = "text", text = kullaniciMetni },
+            new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Gorsel}" } }
+        };
+        return IstekGonderVeYorumlaAsync(model, sistemPrompt, kullaniciIcerik);
+    }
 
-    private async Task<OdaYapilandirmaSonucu> IstekGonderVeYorumlaAsync(string model, string sistemPrompt, string kullaniciMetni)
+    private async Task<OdaYapilandirmaSonucu> IstekGonderVeYorumlaAsync(string model, string sistemPrompt, object kullaniciIcerik)
     {
         var istekGovdesi = new
         {
             model,
             max_tokens = 400,
-            messages = new[]
+            messages = new object[]
             {
                 new { role = "system", content = sistemPrompt },
-                new { role = "user", content = kullaniciMetni }
+                new { role = "user", content = kullaniciIcerik }
             }
         };
 
