@@ -4,7 +4,22 @@
 @inject VeriDeposu Veri
 
 <h1>Poz Kütüphanesi</h1>
-<p>Tüm projelerde ortak kullanılan poz ve analiz kayıtları (ÇŞB rayiç esaslı).</p>
+<p>Tüm projelerde ortak kullanılan poz ve analiz kayıtları (ÇŞB rayiç esaslı) — @Veri.Pozlar.Count kayıt.</p>
+
+<input type="text" class="poz-secici-input" style="max-width:28rem"
+       placeholder="Poz kodu veya adında ara..."
+       value="@aramaMetni" @oninput="AramaDegisti" />
+
+<p class="hata-mesaj" style="color:var(--ink-soft)">
+    @if (aramaMetni.Trim().Length == 0)
+    {
+        <text>@Gosterilecek.Count / @Veri.Pozlar.Count kayıt gösteriliyor — daraltmak için arama kutusunu kullanın.</text>
+    }
+    else
+    {
+        <text>@Gosterilecek.Count eşleşme (kod veya ada göre, en fazla @GosterimLimiti gösterilir).</text>
+    }
+</p>
 
 <table class="veri-tablo">
     <thead>
@@ -16,7 +31,7 @@
         </tr>
     </thead>
     <tbody>
-        @foreach (var p in Veri.Pozlar)
+        @foreach (var p in Gosterilecek)
         {
             <tr>
                 <td>@p.PozKodu</td>
@@ -27,3 +42,22 @@
         }
     </tbody>
 </table>
+
+@code {
+    private const int GosterimLimiti = 300;
+    private string aramaMetni = "";
+
+    private List<Poz> Gosterilecek
+    {
+        get
+        {
+            var t = aramaMetni.Trim();
+            var kaynak = t.Length == 0
+                ? Veri.Pozlar
+                : Veri.Pozlar.Where(p => p.PozKodu.Contains(t, StringComparison.OrdinalIgnoreCase) || p.Ad.Contains(t, StringComparison.OrdinalIgnoreCase));
+            return kaynak.Take(GosterimLimiti).ToList();
+        }
+    }
+
+    private void AramaDegisti(ChangeEventArgs e) => aramaMetni = e.Value?.ToString() ?? "";
+}

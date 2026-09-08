@@ -46,31 +46,62 @@ public class CizimAnalizServisi
 
         var sonuclar = new List<CizimAnalizSonucu>();
 
-        using var pdf = PdfDocument.Open(pdfBaytlari);
-        foreach (var sayfa in pdf.GetPages())
-        {
-            var kelimeler = sayfa.GetWords().ToList();
+        // 1. geçiş: tüm sayfaların kelime/kümelerini topla — AI'ya henüz hiçbir şey gönderilmedi.
+        var sayfaVerileri = new List<(int SayfaNo, double Genislik, double Yukseklik, List<Word> Kelimeler,
+            List<(string Metin, double Sol, double Alt, double Sag, double Ust)> Kumeler)>();
 
-            if (kelimeler.Count == 0)
+        using (var pdf = PdfDocument.Open(pdfBaytlari))
+        {
+            foreach (var sayfa in pdf.GetPages())
+            {
+                // 2.5 — ardışık tekrarı en başta çök (OCR damga/kaşe artefaktı ihtimaline karşı).
+                var hamKelimeler = CizimGurultuFiltresi.ArdisikTekrariColaps(sayfa.GetWords().ToList(), w => w.Text);
+                var kumeler = hamKelimeler.Count == 0
+                    ? new List<(string, double, double, double, double)>()
+                    : MetinKumeleriOlustur(hamKelimeler);
+                sayfaVerileri.Add((sayfa.Number, sayfa.Width, sayfa.Height, hamKelimeler, kumeler));
+            }
+        }
+
+        var tumKumeMetinleri = sayfaVerileri.SelectMany(s => s.Kumeler.Select(k => k.Metin)).ToList();
+
+        // 2.4 (tekrar tabanlı) — sayfaların %80+'inde aynen tekrarlayan bloklar (pafta/antet/legend).
+        var paftaTekrarBloklari = CizimGurultuFiltresi.TekrarEdenBloklariBul(tumKumeMetinleri);
+
+        // Bölüm 4 — proje disiplinini tüm sayfalardaki metinlerden tespit et, AI'ya bağlam olarak ver.
+        var disiplin = DisiplinTespitServisi.TespitEt(tumKumeMetinleri);
+
+        foreach (var sayfaVerisi in sayfaVerileri)
+        {
+            if (sayfaVerisi.Kelimeler.Count == 0)
             {
                 // Taranmış (resim) sayfa — metin katmanı yok, doğrudan görsele bak.
-                var gorsel = SayfaGorseliOlustur(pdfBaytlari, sayfa.Number, sayfa.Width, sayfa.Height, kirpma: null);
-                var oda = await _ai.GorseldenOdaCikarAsync(gorsel, _veri.Pozlar);
-                sonuclar.Add(SonucaCevir(oda, KaynakTuru.AIGorsel, $"Sayfa {sayfa.Number}"));
+                var gorsel = SayfaGorseliOlustur(pdfBaytlari, sayfaVerisi.SayfaNo, sayfaVerisi.Genislik, sayfaVerisi.Yukseklik, kirpma: null);
+                var oda = await _ai.GorseldenOdaCikarAsync(gorsel, _veri.Pozlar, disiplin);
+                sonuclar.Add(SonucaCevir(oda, KaynakTuru.AIGorsel, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin));
                 continue;
             }
 
-            foreach (var kume in MetinKumeleriOlustur(kelimeler))
+            foreach (var kume in sayfaVerisi.Kumeler)
             {
-                var oda = await _ai.MetinKumesindenOdaCikarAsync(kume.Metin, _veri.Pozlar);
+                // Ön filtre: kot/pafta/diğer gürültü ile ölçü zinciri ve tekrar eden pafta blokları
+                // AI'ya hiç gönderilmez (Bölüm 2).
+                if (CizimGurultuFiltresi.GurultuMu(kume.Metin) ||
+                    CizimGurultuFiltresi.OlcuZinciriBlokMu(kume.Metin) ||
+                    paftaTekrarBloklari.Contains(kume.Metin.Trim()))
+                {
+                    continue;
+                }
+
+                var oda = await _ai.MetinKumesindenOdaCikarAsync(kume.Metin, _veri.Pozlar, disiplin);
                 var kaynak = KaynakTuru.VektorMetin;
 
                 if (oda.Guven < GorselFallbackGuvenEsigi)
                 {
                     // Metin kümesi belirsiz — o bölgenin kırpılmış görselini yapay zeka görüşüne gönder.
-                    var gorsel = SayfaGorseliOlustur(pdfBaytlari, sayfa.Number, sayfa.Width, sayfa.Height,
+                    var gorsel = SayfaGorseliOlustur(pdfBaytlari, sayfaVerisi.SayfaNo, sayfaVerisi.Genislik, sayfaVerisi.Yukseklik,
                         (kume.Sol, kume.Alt, kume.Sag, kume.Ust));
-                    var gorselOda = await _ai.GorseldenOdaCikarAsync(gorsel, _veri.Pozlar);
+                    var gorselOda = await _ai.GorseldenOdaCikarAsync(gorsel, _veri.Pozlar, disiplin);
                     if (gorselOda.Guven > oda.Guven)
                     {
                         oda = gorselOda;
@@ -78,14 +109,14 @@ public class CizimAnalizServisi
                     }
                 }
 
-                sonuclar.Add(SonucaCevir(oda, kaynak, $"Sayfa {sayfa.Number}"));
+                sonuclar.Add(SonucaCevir(oda, kaynak, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin));
             }
         }
 
         return sonuclar;
     }
 
-    private static CizimAnalizSonucu SonucaCevir(OdaYapilandirmaSonucu oda, KaynakTuru kaynak, string varsayilanKat)
+    private static CizimAnalizSonucu SonucaCevir(OdaYapilandirmaSonucu oda, KaynakTuru kaynak, string varsayilanKat, ProjeDisiplini disiplin)
     {
         return new CizimAnalizSonucu
         {
@@ -96,7 +127,8 @@ public class CizimAnalizServisi
             GuvenSkoru = GuveneCevir(oda.Guven),
             OnerilenPozId = oda.OnerilenPozId,
             OneriGerekcesi = oda.Gerekce,
-            KullanilanModel = oda.KullanilanModel
+            KullanilanModel = oda.KullanilanModel,
+            Disiplin = disiplin
         };
     }
 
@@ -231,10 +263,21 @@ public class CizimAnalizServisi
             }
         }
 
+        // 2.5 — ardışık tekrarı en başta çök, sonra kot/pafta/diğer gürültü metinlerini ayıkla
+        // (oda-adı eşleştirmesine karışmasınlar diye) — bkz. Bölüm 2.
+        metinler = CizimGurultuFiltresi
+            .ArdisikTekrariColaps(metinler, m => m.Deger)
+            .Where(m => !CizimGurultuFiltresi.GurultuMu(m.Deger))
+            .ToList();
+
         // Gerçek TEXT/MTEXT sayısı, poligon sayısına göre çok düşükse metin muhtemelen
         // çizgilere/polyline'lara patlatılmış (exploded) demektir — bu durumda oda adı
         // eşleştirmesi güvenilmez, güven seviyesi düşürülür.
         bool metinPatlatilmisOlabilir = poligonlar.Count > 0 && metinler.Count < poligonlar.Count * 0.3;
+
+        // Bölüm 4 — disiplin tespiti: DWG'de en güçlü sinyal katman adları (4.1.2), ek olarak metinler.
+        var katmanAdlari = poligonlar.Select(p => p.Katman).Concat(metinler.Select(m => m.Katman)).Distinct().ToList();
+        var disiplin = DisiplinTespitServisi.TespitEt(metinler.Select(m => m.Deger), katmanAdlari);
 
         var sonuclar = new List<CizimAnalizSonucu>();
         foreach (var (noktalar, katman) in poligonlar)
@@ -272,7 +315,8 @@ public class CizimAnalizServisi
                 OneriGerekcesi = metinPatlatilmisOlabilir
                     ? "Alan shoelace formülüyle deterministik hesaplandı. Çizimde gerçek TEXT/MTEXT azlığı, metnin poligonlara patlatılmış (exploded) olabileceğini gösteriyor — oda adı en yakın metne göre tahmin edildi, elle doğrulayın."
                     : "Alan shoelace formülüyle deterministik hesaplandı, oda adı en yakın metin etiketiyle eşleştirildi.",
-                KullanilanModel = "geometrik (shoelace + en-yakın-metin)"
+                KullanilanModel = "geometrik (shoelace + en-yakın-metin)",
+                Disiplin = disiplin
             });
         }
 
@@ -285,7 +329,7 @@ public class CizimAnalizServisi
         foreach (var oda in odalar)
         {
             var baglam = $"Kaynak: DWG çizimi ({dosyaAdi})\nOda/alan adı: {oda.OdaAdi}\nKat: {(string.IsNullOrWhiteSpace(oda.KatAdi) ? "belirtilmemiş" : oda.KatAdi)}\nAlan: {oda.AlanM2} m2\nGeometri: kapalı poligon (shoelace ile deterministik hesaplandı)";
-            var oneri = await _ai.MetinKumesindenOdaCikarAsync(baglam, _veri.Pozlar);
+            var oneri = await _ai.MetinKumesindenOdaCikarAsync(baglam, _veri.Pozlar, oda.Disiplin);
             oda.OnerilenPozId = oneri.OnerilenPozId;
             oda.OneriGerekcesi = string.IsNullOrWhiteSpace(oneri.Gerekce) ? oda.OneriGerekcesi : oneri.Gerekce;
             oda.KullanilanModel = string.IsNullOrWhiteSpace(oneri.KullanilanModel) ? oda.KullanilanModel : oneri.KullanilanModel;

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using InsaatMetrajWeb.Models;
 
 namespace InsaatMetrajWeb.Services;
@@ -39,15 +40,64 @@ public class AiSiniflandirmaServisi
         KullanilanModel = "yapılandırılmadı"
     };
 
-    /// <summary>Bir metin kümesini (ör. bir PDF sayfasında birbirine yakın "oda adı" + "alan: X m²" satırları) yapılandırılmış oda bilgisine çevirir.</summary>
-    public Task<OdaYapilandirmaSonucu> MetinKumesindenOdaCikarAsync(string metinKumesi, List<Poz> pozlar)
-        => HibritSiniflandirAsync(pozlar, model => _saglayici.MetinSiniflandirAsync(
-            model, SistemPrompt(pozlar), $"Çizimden çıkarılan metin kümesi:\n{metinKumesi}"));
+    /// <summary>Bir metin kümesini (ör. bir PDF sayfasında birbirine yakın "oda adı" + "alan: X m²" satırları) yapılandırılmış oda bilgisine çevirir.
+    /// <paramref name="disiplin"/> tespit edilebildiyse (DisiplinTespitServisi), AI'ya hangi disipline
+    /// öncelik vermesi gerektiği bağlam olarak verilir — poz listesini daraltmaz, sadece yönlendirir.</summary>
+    public Task<OdaYapilandirmaSonucu> MetinKumesindenOdaCikarAsync(string metinKumesi, List<Poz> pozlar, ProjeDisiplini disiplin = ProjeDisiplini.Bilinmiyor)
+    {
+        var adaylar = DaraltilmisPozlar(pozlar, metinKumesi);
+        return HibritSiniflandirAsync(adaylar, model => _saglayici.MetinSiniflandirAsync(
+            model, SistemPrompt(adaylar, disiplin), $"Çizimden çıkarılan metin kümesi:\n{metinKumesi}"));
+    }
 
     /// <summary>Metin katmanı yoksa/yetersizse (taranmış PDF, patlatılmış DWG metni) sayfa/bölge görselini doğrudan yapay zeka görüşüne gönderir.</summary>
-    public Task<OdaYapilandirmaSonucu> GorseldenOdaCikarAsync(byte[] pngGorsel, List<Poz> pozlar)
-        => HibritSiniflandirAsync(pozlar, model => _saglayici.GorselSiniflandirAsync(
-            model, SistemPrompt(pozlar), "Çizimin bu bölgesinin görseli aşağıda. Metin katmanı yoktu veya yetersizdi, bu yüzden görsele bakarak yorumla.", pngGorsel));
+    public Task<OdaYapilandirmaSonucu> GorseldenOdaCikarAsync(byte[] pngGorsel, List<Poz> pozlar, ProjeDisiplini disiplin = ProjeDisiplini.Bilinmiyor)
+    {
+        // Görsel modda daraltma için kullanılabilecek bir sorgu metni yok; poz kütüphanesi
+        // binlerce kalem içerebileceğinden (bkz. DaraltilmisPozlar), en azından mantıksız
+        // derecede büyük bir liste gönderilmesin diye ilk AdayPozLimiti kadarıyla sınırlanır.
+        var adaylar = pozlar.Count > AdayPozLimiti ? pozlar.Take(AdayPozLimiti).ToList() : pozlar;
+        return HibritSiniflandirAsync(adaylar, model => _saglayici.GorselSiniflandirAsync(
+            model, SistemPrompt(adaylar, disiplin), "Çizimin bu bölgesinin görseli aşağıda. Metin katmanı yoktu veya yetersizdi, bu yüzden görsele bakarak yorumla.", pngGorsel));
+    }
+
+    private const int AdayPozLimiti = 60;
+
+    private static readonly HashSet<string> DurakKelimeler = new()
+    {
+        "oda", "alan", "kat", "metre", "kare", "adet", "olan", "icin", "için", "ile", "her", "bir", "ve", "veya"
+    };
+
+    /// <summary>
+    /// Poz kütüphanesi binlerce kalem içerdiğinden (bkz. PozKutuphanesi), her sınıflandırma
+    /// isteğinde TÜM listeyi yapay zekaya göndermek hem maliyetli hem de aday sayısı arttıkça
+    /// modelin doğru pozu seçme isabetini düşürür. Bunun yerine sorgu metnindeki anlamlı
+    /// kelimelerle poz adı arasında basit bir kelime-örtüşme skoru hesaplanıp en iyi eşleşen
+    /// AdayPozLimiti kadarı adaylık listesine alınır — nihai kararı yine AI verir, bu sadece
+    /// adayları daraltan bir ön filtre (kural tabanlı bir bypass değildir).
+    /// </summary>
+    private static List<Poz> DaraltilmisPozlar(List<Poz> pozlar, string sorguMetni)
+    {
+        if (pozlar.Count <= AdayPozLimiti) return pozlar;
+
+        var kelimeler = Regex.Matches(sorguMetni.ToLowerInvariant(), @"[a-zçğıöşü]{3,}")
+            .Select(m => m.Value)
+            .Where(k => !DurakKelimeler.Contains(k))
+            .Distinct()
+            .ToList();
+
+        if (kelimeler.Count == 0) return pozlar.Take(AdayPozLimiti).ToList();
+
+        var eslesenler = pozlar
+            .Select(p => (Poz: p, Puan: kelimeler.Count(k => p.Ad.Contains(k, StringComparison.OrdinalIgnoreCase))))
+            .Where(x => x.Puan > 0)
+            .OrderByDescending(x => x.Puan)
+            .Take(AdayPozLimiti)
+            .Select(x => x.Poz)
+            .ToList();
+
+        return eslesenler.Count > 0 ? eslesenler : pozlar.Take(AdayPozLimiti).ToList();
+    }
 
     private async Task<OdaYapilandirmaSonucu> HibritSiniflandirAsync(List<Poz> pozlar, Func<string, Task<OdaYapilandirmaSonucu>> tekModelCagir)
     {
@@ -83,9 +133,13 @@ public class AiSiniflandirmaServisi
         }
     }
 
-    private static string SistemPrompt(List<Poz> pozlar)
+    private static string SistemPrompt(List<Poz> pozlar, ProjeDisiplini disiplin)
     {
         var pozListesi = string.Join("\n", pozlar.Select(p => $"- id:{p.Id} kod:{p.PozKodu} ad:\"{p.Ad}\" birim:{p.Birim}"));
+
+        var disiplinBaglami = disiplin == ProjeDisiplini.Bilinmiyor
+            ? ""
+            : $"\nBu proje bir {DisiplinTespitServisi.GosterimAdi(disiplin)} projesidir — poz seçerken öncelikle bu disipline uygun kalemleri değerlendir.\n";
 
         return $$"""
             Sen bir inşaat metraj uzmanısın. Sana bir mimari çizimden (PDF veya DWG)
@@ -93,7 +147,7 @@ public class AiSiniflandirmaServisi
             Görevin: oda adını, alanını (m²) ve varsa kat/seviye adını çıkarmak, ayrıca
             aşağıdaki poz listesinden bu odaya en uygun kalemi (ör. döşeme kaplaması)
             önermek.
-
+            {{disiplinBaglami}}
             Poz listesi:
             {{pozListesi}}
 

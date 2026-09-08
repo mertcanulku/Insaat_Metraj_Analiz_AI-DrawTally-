@@ -7,82 +7,25 @@ using System.Text.RegularExpressions;
 namespace InsaatMetrajWeb.Services;
 
 /// <summary>
-/// Poz/Rayiç/Alias kütüphanesi tüm kullanıcılar arasında ortak olduğu için bellekte tutulur
-/// (demo amaçlı sabit veri). Projeler ve metraj kalemleri ise kullanıcıya özel olduğundan
-/// veritabanında (ApplicationDbContext) saklanır — bkz. ProjeBul, ProjeleriListele, ProjeEkle.
+/// Poz/Rayiç/Alias kütüphanesi tüm kullanıcılar arasında ortak olduğu için PozKutuphanesi
+/// (singleton, ÇŞB 2026 verisiyle bir kez veritabanından yüklenip bellekte tutulur) üzerinden
+/// okunur — bkz. Program.cs, PozKutuphanesi.SeedVeYukleAsync. Projeler ve metraj kalemleri ise
+/// kullanıcıya özel olduğundan veritabanında (ApplicationDbContext) saklanır — bkz. ProjeBul,
+/// ProjeleriListele, ProjeEkle.
 /// </summary>
 public class VeriDeposu
 {
     private readonly ApplicationDbContext _db;
+    private readonly PozKutuphanesi _kutuphane;
 
-    public List<Rayic> Rayicler { get; } = new();
-    public List<Poz> Pozlar { get; } = new();
-    public List<Alias> Aliaslar { get; } = new();
+    public List<Rayic> Rayicler => _kutuphane.Rayicler;
+    public List<Poz> Pozlar => _kutuphane.Pozlar;
+    public List<Alias> Aliaslar => _kutuphane.Aliaslar;
 
-    public VeriDeposu(ApplicationDbContext db)
+    public VeriDeposu(ApplicationDbContext db, PozKutuphanesi kutuphane)
     {
         _db = db;
-        // --- Rayiçler (ÇŞB 2026 örnek fiyatlar) ---
-        var hazirBeton = new Rayic { Id = 1, PozKodu = "10.130.1310", Ad = "Hazır beton C12/15", Birim = "m3", Kategori = "malzeme", Fiyat = 2650m, GecerlilikTarihi = new DateOnly(2026, 9, 1) };
-        var betonPompasi = new Rayic { Id = 2, PozKodu = "10.500.2001", Ad = "Beton pompası (saat)", Birim = "saat", Kategori = "makine", Fiyat = 1450m, GecerlilikTarihi = new DateOnly(2026, 9, 1) };
-        var duzIsci = new Rayic { Id = 3, PozKodu = "10.100.1001", Ad = "Düz işçi (saat)", Birim = "saat", Kategori = "işçilik", Fiyat = 185m, GecerlilikTarihi = new DateOnly(2026, 9, 1) };
-        var demir = new Rayic { Id = 4, PozKodu = "10.140.1005", Ad = "Nervürlü inşaat demiri", Birim = "kg", Kategori = "malzeme", Fiyat = 42m, GecerlilikTarihi = new DateOnly(2026, 9, 1) };
-        var demirci = new Rayic { Id = 5, PozKodu = "10.100.1010", Ad = "Demirci ustası (saat)", Birim = "saat", Kategori = "işçilik", Fiyat = 260m, GecerlilikTarihi = new DateOnly(2026, 9, 1) };
-        var duvarBrikeri = new Rayic { Id = 6, PozKodu = "10.200.2050", Ad = "Yatay delikli tuğla (8.5x19x19)", Birim = "adet", Kategori = "malzeme", Fiyat = 9.5m, GecerlilikTarihi = new DateOnly(2026, 9, 1) };
-        var duvarciUsta = new Rayic { Id = 7, PozKodu = "10.100.1020", Ad = "Duvarcı ustası (saat)", Birim = "saat", Kategori = "işçilik", Fiyat = 245m, GecerlilikTarihi = new DateOnly(2026, 9, 1) };
-        Rayicler.AddRange(new[] { hazirBeton, betonPompasi, duzIsci, demir, demirci, duvarBrikeri, duvarciUsta });
-
-        // --- Pozlar ---
-        var betonPozu = new Poz
-        {
-            Id = 1,
-            PozKodu = "15.150.1002",
-            Ad = "C12/15 hazır beton dökülmesi (pompayla, nakil dahil)",
-            Birim = "m3",
-            AnalizSatirlari = new List<PozAnalizSatiri>
-            {
-                new() { Rayic = hazirBeton, Miktar = 1.02m },
-                new() { Rayic = betonPompasi, Miktar = 0.15m },
-                new() { Rayic = duzIsci, Miktar = 0.25m },
-            }
-        };
-
-        var demirPozu = new Poz
-        {
-            Id = 2,
-            PozKodu = "15.170.1003",
-            Ad = "Nervürlü inşaat demiri işçiliği (kesme, bükme, yerine koyma)",
-            Birim = "kg",
-            AnalizSatirlari = new List<PozAnalizSatiri>
-            {
-                new() { Rayic = demir, Miktar = 1.03m },
-                new() { Rayic = demirci, Miktar = 0.012m },
-            }
-        };
-
-        var duvarPozu = new Poz
-        {
-            Id = 3,
-            PozKodu = "16.150.1005",
-            Ad = "8.5 cm delikli tuğla ile duvar yapılması",
-            Birim = "m2",
-            AnalizSatirlari = new List<PozAnalizSatiri>
-            {
-                new() { Rayic = duvarBrikeri, Miktar = 55m },
-                new() { Rayic = duvarciUsta, Miktar = 0.45m },
-            }
-        };
-
-        Pozlar.AddRange(new[] { betonPozu, demirPozu, duvarPozu });
-
-        // --- Aliaslar (kısaltma / eski kod eşlemeleri) ---
-        Aliaslar.AddRange(new[]
-        {
-            new Alias { Id = 1, PozId = betonPozu.Id, AliasMetin = "beton pompa" },
-            new Alias { Id = 2, PozId = betonPozu.Id, AliasMetin = "Y.16.050/12" },
-            new Alias { Id = 3, PozId = demirPozu.Id, AliasMetin = "demir iscilik" },
-            new Alias { Id = 4, PozId = duvarPozu.Id, AliasMetin = "tugla duvar" },
-        });
+        _kutuphane = kutuphane;
     }
 
     /// <summary>Bir kullanıcının tüm projelerini (en yeni önce) listeler.</summary>
@@ -130,24 +73,8 @@ public class VeriDeposu
 
     private Poz? PozIdIleBul(int id) => Pozlar.FirstOrDefault(p => p.Id == id);
 
-    /// <summary>
-    /// Serbest metin ile poz arar: önce resmi poz koduna, sonra alias tablosuna,
-    /// son olarak poz adının içine bakar. Kullanıcı hangi kısaltmayı/eski kodu
-    /// kullanırsa kullansın doğru poza yönlendirilsin diye üç kademeli arama yapılır.
-    /// </summary>
-    public Poz? PozAra(string metin)
-    {
-        var t = metin.Trim();
-        if (t.Length == 0) return null;
-
-        var kodEslesme = Pozlar.FirstOrDefault(p => p.PozKodu.Equals(t, StringComparison.OrdinalIgnoreCase));
-        if (kodEslesme != null) return kodEslesme;
-
-        var aliasEslesme = Aliaslar.FirstOrDefault(a => a.AliasMetin.Equals(t, StringComparison.OrdinalIgnoreCase));
-        if (aliasEslesme != null) return Pozlar.FirstOrDefault(p => p.Id == aliasEslesme.PozId);
-
-        return Pozlar.FirstOrDefault(p => p.Ad.Contains(t, StringComparison.OrdinalIgnoreCase));
-    }
+    /// <summary>Serbest metin ile poz arar — bkz. PozKutuphanesi.PozAra.</summary>
+    public Poz? PozAra(string metin) => _kutuphane.PozAra(metin);
 
     /// <summary>
     /// CSV içeriğini satır satır işleyip verilen projeye metraj kalemleri ekler.
@@ -158,6 +85,7 @@ public class VeriDeposu
     public async Task<List<ImportSonucSatiri>> ProjeyeCsvImportEt(Proje proje, string csvIcerik)
     {
         var sonuclar = new List<ImportSonucSatiri>();
+        var eklenenKayitlar = new List<(ImportSonucSatiri Sonuc, MetrajKalemiKaydi Kayit)>();
         var satirlar = csvIcerik.Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
         for (int i = 0; i < satirlar.Length; i++)
@@ -184,15 +112,6 @@ public class VeriDeposu
             var olcumDetayi = parcalar[1].Trim();
             var miktarMetni = parcalar[2].Trim().Replace(",", ".");
 
-            var eslesenPoz = PozAra(pozAramaMetni);
-            if (eslesenPoz == null)
-            {
-                sonuc.Basarili = false;
-                sonuc.Mesaj = $"\"{pozAramaMetni}\" hiçbir poz veya kısaltmaya eşleşmedi";
-                sonuclar.Add(sonuc);
-                continue;
-            }
-
             if (!decimal.TryParse(miktarMetni, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var miktar))
             {
                 sonuc.Basarili = false;
@@ -201,21 +120,38 @@ public class VeriDeposu
                 continue;
             }
 
-            _db.MetrajKalemleri.Add(new MetrajKalemiKaydi
+            var eslesenPoz = PozAra(pozAramaMetni);
+            if (eslesenPoz == null)
+            {
+                sonuc.Basarili = false;
+                sonuc.Mesaj = $"\"{pozAramaMetni}\" hiçbir poz veya kısaltmaya eşleşmedi — aşağıdan elle poz seçip ekleyebilirsin";
+                sonuc.PozEksik = true;
+                sonuc.OlcumDetayiTaslak = olcumDetayi;
+                sonuc.MiktarTaslak = miktar;
+                sonuclar.Add(sonuc);
+                continue;
+            }
+
+            var kayit = new MetrajKalemiKaydi
             {
                 ProjeKaydiId = proje.Id,
                 PozId = eslesenPoz.Id,
                 OlcumDetayi = olcumDetayi,
                 Miktar = miktar
-            });
+            };
+            _db.MetrajKalemleri.Add(kayit);
 
             sonuc.Basarili = true;
             sonuc.EslesenPozKodu = eslesenPoz.PozKodu;
             sonuc.Mesaj = $"Eklendi -> {eslesenPoz.PozKodu} ({eslesenPoz.Ad})";
             sonuclar.Add(sonuc);
+            eklenenKayitlar.Add((sonuc, kayit));
         }
 
         await _db.SaveChangesAsync();
+        foreach (var (sonuc, kayit) in eklenenKayitlar)
+            sonuc.EklenenMetrajKalemiId = kayit.Id;
+
         return sonuclar;
     }
 
@@ -232,6 +168,7 @@ public class VeriDeposu
     public async Task<List<ImportSonucSatiri>> ProjeyePdfImportEt(Proje proje, Stream pdfStream)
     {
         var sonuclar = new List<ImportSonucSatiri>();
+        var eklenenKayitlar = new List<(ImportSonucSatiri Sonuc, MetrajKalemiKaydi Kayit)>();
         var pozKoduDeseni = new Regex(@"\d{2}\.\d{3}\.\d{4}");
         var sondakiSayiDeseni = new Regex(@"(\d+[.,]\d+|\d+)\s*$");
 
@@ -266,14 +203,6 @@ public class VeriDeposu
                         eslesenPoz = Pozlar.FirstOrDefault(p => p.Id == aliasEslesme.PozId);
                 }
 
-                if (eslesenPoz == null)
-                {
-                    sonuc.Basarili = false;
-                    sonuc.Mesaj = "Satırda bilinen bir poz kodu veya kısaltma bulunamadı";
-                    sonuclar.Add(sonuc);
-                    continue;
-                }
-
                 // 2) Satırın sonundaki sayıyı miktar olarak al
                 var miktarEslesme = sondakiSayiDeseni.Match(satir);
                 if (!miktarEslesme.Success ||
@@ -282,7 +211,9 @@ public class VeriDeposu
                         System.Globalization.CultureInfo.InvariantCulture, out var miktar))
                 {
                     sonuc.Basarili = false;
-                    sonuc.Mesaj = $"Poz bulundu ({eslesenPoz.PozKodu}) ama satır sonunda geçerli bir miktar bulunamadı";
+                    sonuc.Mesaj = eslesenPoz == null
+                        ? "Satırda bilinen bir poz kodu/kısaltma ve geçerli bir miktar bulunamadı"
+                        : $"Poz bulundu ({eslesenPoz.PozKodu}) ama satır sonunda geçerli bir miktar bulunamadı";
                     sonuclar.Add(sonuc);
                     continue;
                 }
@@ -290,23 +221,40 @@ public class VeriDeposu
                 var olcumDetayi = satir;
                 if (kodEslesme.Success) olcumDetayi = olcumDetayi.Replace(kodEslesme.Value, "").Trim();
                 olcumDetayi = olcumDetayi.Replace(miktarEslesme.Value, "").Trim(' ', '-', ':', ';');
+                if (olcumDetayi.Length == 0) olcumDetayi = "(PDF'den otomatik alındı)";
 
-                _db.MetrajKalemleri.Add(new MetrajKalemiKaydi
+                if (eslesenPoz == null)
+                {
+                    sonuc.Basarili = false;
+                    sonuc.Mesaj = "Satırda bilinen bir poz kodu veya kısaltma bulunamadı — aşağıdan elle poz seçip ekleyebilirsin";
+                    sonuc.PozEksik = true;
+                    sonuc.OlcumDetayiTaslak = olcumDetayi;
+                    sonuc.MiktarTaslak = miktar;
+                    sonuclar.Add(sonuc);
+                    continue;
+                }
+
+                var kayit = new MetrajKalemiKaydi
                 {
                     ProjeKaydiId = proje.Id,
                     PozId = eslesenPoz.Id,
-                    OlcumDetayi = olcumDetayi.Length > 0 ? olcumDetayi : "(PDF'den otomatik alındı)",
+                    OlcumDetayi = olcumDetayi,
                     Miktar = miktar
-                });
+                };
+                _db.MetrajKalemleri.Add(kayit);
 
                 sonuc.Basarili = true;
                 sonuc.EslesenPozKodu = eslesenPoz.PozKodu;
                 sonuc.Mesaj = $"Eklendi -> {eslesenPoz.PozKodu} ({eslesenPoz.Ad}), miktar: {miktar}";
                 sonuclar.Add(sonuc);
+                eklenenKayitlar.Add((sonuc, kayit));
             }
         }
 
         await _db.SaveChangesAsync();
+        foreach (var (sonuc, kayit) in eklenenKayitlar)
+            sonuc.EklenenMetrajKalemiId = kayit.Id;
+
         return sonuclar;
     }
 
@@ -314,15 +262,42 @@ public class VeriDeposu
     public async Task OdaAnalizSonucunuOnayla(Proje proje, CizimAnalizSonucu sonuc, Poz poz)
     {
         var katBilgisi = string.IsNullOrWhiteSpace(sonuc.KatAdi) ? "" : $", kat: {sonuc.KatAdi}";
-        _db.MetrajKalemleri.Add(new MetrajKalemiKaydi
+        var kayit = new MetrajKalemiKaydi
         {
             ProjeKaydiId = proje.Id,
             PozId = poz.Id,
             OlcumDetayi = $"AI çizim analiziyle eklendi — oda: {sonuc.OdaAdi}{katBilgisi} ({sonuc.KaynakTuru})",
             Miktar = sonuc.AlanM2
-        });
+        };
+        _db.MetrajKalemleri.Add(kayit);
         await _db.SaveChangesAsync();
         sonuc.OnaylandiMi = true;
+        sonuc.EklenenMetrajKalemiId = kayit.Id;
+    }
+
+    /// <summary>
+    /// CSV/PDF import satırı ilk seferde hiçbir poz/kısaltmaya eşleşmediğinde (PozEksik=true),
+    /// kullanıcı listeden elle bir poz seçtiğinde bu metotla tamamlanır.
+    /// </summary>
+    public async Task ImportSatiriniManuelPozIleTamamla(Proje proje, ImportSonucSatiri sonuc, Poz poz)
+    {
+        if (sonuc.MiktarTaslak is not { } miktar) return;
+
+        var kayit = new MetrajKalemiKaydi
+        {
+            ProjeKaydiId = proje.Id,
+            PozId = poz.Id,
+            OlcumDetayi = sonuc.OlcumDetayiTaslak,
+            Miktar = miktar
+        };
+        _db.MetrajKalemleri.Add(kayit);
+        await _db.SaveChangesAsync();
+
+        sonuc.Basarili = true;
+        sonuc.PozEksik = false;
+        sonuc.EslesenPozKodu = poz.PozKodu;
+        sonuc.Mesaj = $"Elle poz seçilerek eklendi -> {poz.PozKodu} ({poz.Ad})";
+        sonuc.EklenenMetrajKalemiId = kayit.Id;
     }
 
     /// <summary>Metraj Girişi sayfasından elle eklenen bir kalemi projeye kaydeder.</summary>
@@ -336,5 +311,20 @@ public class VeriDeposu
             Miktar = miktar
         });
         await _db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Bir metraj kalemini projeden siler (import/AI önerisiyle veya elle eklenmiş olabilir).
+    /// Sadece kalemin ait olduğu proje verilen proje ile eşleşiyorsa siler — başka kullanıcının
+    /// kalemini id tahmin ederek silmeyi engeller.
+    /// </summary>
+    public async Task<bool> MetrajKalemiSil(Proje proje, int metrajKalemiId)
+    {
+        var kayit = await _db.MetrajKalemleri.FirstOrDefaultAsync(k => k.Id == metrajKalemiId && k.ProjeKaydiId == proje.Id);
+        if (kayit == null) return false;
+
+        _db.MetrajKalemleri.Remove(kayit);
+        await _db.SaveChangesAsync();
+        return true;
     }
 }

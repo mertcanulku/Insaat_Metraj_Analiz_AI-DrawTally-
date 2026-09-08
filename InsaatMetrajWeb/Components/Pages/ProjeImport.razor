@@ -80,6 +80,7 @@ else
                     <th>Ham Veri</th>
                     <th>Durum</th>
                     <th>Mesaj</th>
+                    <th>İşlem</th>
                 </tr>
             </thead>
             <tbody>
@@ -88,8 +89,19 @@ else
                     <tr class="@(s.Basarili ? "satir-basarili" : "satir-hatali")">
                         <td>@s.SatirNo</td>
                         <td>@s.HamMetin</td>
-                        <td>@(s.Basarili ? "✓ Başarılı" : "✗ Eşleşmedi")</td>
+                        <td>@(s.Basarili ? "✓ Başarılı" : (s.PozEksik ? "⚠ Poz seçilmedi" : "✗ Eşleşmedi"))</td>
                         <td>@s.Mesaj</td>
+                        <td>
+                            @if (s.Basarili && s.EklenenMetrajKalemiId.HasValue)
+                            {
+                                <button @onclick="() => ImportSatiriSil(s)">Sil</button>
+                            }
+                            else if (s.PozEksik)
+                            {
+                                <PozSecici Pozlar="Veri.Pozlar" @bind-SeciliPozId="s.SeciliPozId" />
+                                <button @onclick="() => ImportSatiriniPozIleTamamla(s)" disabled="@(!s.SeciliPozId.HasValue)">Ekle</button>
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -98,65 +110,132 @@ else
         @if (basarisizSayisi > 0)
         {
             <p class="hata-mesaj">
-                Eşleşmeyen satırlar için: poz kodunu Poz Kütüphanesi sayfasından kontrol et,
-                veya eksik kısaltmayı geliştirici ekibine bildirip Alias tablosuna eklet.
+                Poz bulunamayan satırlar için yukarıdan elle poz seçip ekleyebilirsin — hiçbiri sessizce atlanmaz.
             </p>
         }
     }
 
     @if (odaSonuclari.Count > 0)
     {
-        var onaysizSayisi = odaSonuclari.Count(s => !s.OnaylandiMi);
-        <h3>Çizim Analizi — Oda/Alan Önerileri (@sonYuklenenFormat)</h3>
-        <p>
-            Aşağıdaki satırlar sadece öneridir; hiçbiri onaylanmadan projenin metraj tablosuna eklenmez.
-            @if (onaysizSayisi > 0)
+        var kesinSonuclar = odaSonuclari.Where(s => s.GuvenSkoru != GuvenSkoru.Dusuk).ToList();
+        var belirsizSonuclar = odaSonuclari.Where(s => s.GuvenSkoru == GuvenSkoru.Dusuk).ToList();
+        var kesinOnaysizSayisi = kesinSonuclar.Count(s => !s.OnaylandiMi);
+        var disiplin = odaSonuclari.Select(s => s.Disiplin).FirstOrDefault(d => d != ProjeDisiplini.Bilinmiyor);
+
+        <h3>
+            Çizim Analizi — Oda/Alan Önerileri (@sonYuklenenFormat)
+            @if (disiplin != ProjeDisiplini.Bilinmiyor)
             {
-                <button @onclick="TumunuOnayla">Tümünü Onayla ve Ekle (@onaysizSayisi)</button>
+                <span class="disiplin-etiket">@DisiplinTespitServisi.GosterimAdi(disiplin)</span>
             }
-        </p>
-        <table class="veri-tablo">
-            <thead>
-                <tr>
-                    <th>Oda Adı</th>
-                    <th>Alan (m²)</th>
-                    <th>Kat</th>
-                    <th>Kaynak</th>
-                    <th>Güven</th>
-                    <th>Önerilen Poz</th>
-                    <th>Gerekçe / Model</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @for (int i = 0; i < odaSonuclari.Count; i++)
-                {
-                    var index = i;
-                    var s = odaSonuclari[index];
-                    var poz = s.OnerilenPozId.HasValue ? Veri.Pozlar.FirstOrDefault(p => p.Id == s.OnerilenPozId) : null;
-                    <tr class="@(s.OnaylandiMi ? "satir-basarili" : (poz == null ? "satir-hatali" : ""))">
-                        <td>@s.OdaAdi</td>
-                        <td>@s.AlanM2.ToString("0.00")</td>
-                        <td>@(string.IsNullOrWhiteSpace(s.KatAdi) ? "—" : s.KatAdi)</td>
-                        <td>@KaynakEtiketi(s.KaynakTuru)</td>
-                        <td>@s.GuvenSkoru</td>
-                        <td>@(poz != null ? $"{poz.PozKodu} — {poz.Ad}" : "—")</td>
-                        <td style="font-size:0.85rem">@s.OneriGerekcesi @(!string.IsNullOrEmpty(s.KullanilanModel) ? $"({s.KullanilanModel})" : "")</td>
-                        <td>
-                            @if (s.OnaylandiMi)
-                            {
-                                <span>✓ Eklendi</span>
-                            }
-                            else if (poz != null)
-                            {
-                                <button @onclick="() => OdaOnerisiOnayla(index)">Onayla ve Ekle</button>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        </h3>
+        <p>Aşağıdaki satırlar sadece öneridir; hiçbiri onaylanmadan projenin metraj tablosuna eklenmez.</p>
+
+        <h4>
+            Kesin Eşleşmeler (@kesinSonuclar.Count)
+            @if (kesinOnaysizSayisi > 0)
+            {
+                <button @onclick="TumunuOnayla">Tümünü Onayla ve Ekle (@kesinOnaysizSayisi)</button>
+            }
+        </h4>
+        @if (kesinSonuclar.Count == 0)
+        {
+            <p><em>Yüksek/orta güvenle eşleşen satır yok.</em></p>
+        }
+        else
+        {
+            @OdaSonucTablosu(kesinSonuclar)
+        }
+
+        @if (belirsizSonuclar.Count > 0)
+        {
+            <h4>Belirsiz Eşleşmeler (@belirsizSonuclar.Count)</h4>
+            <p>
+                Yapay zekanın güveni düşük olduğu için otomatik eklenmez — gerekçesini okuyup elle
+                poz seçerek veya düzelterek onaylayabilirsin.
+            </p>
+            @OdaSonucTablosu(belirsizSonuclar)
+        }
     }
+}
+
+@code {
+    private RenderFragment OdaSonucTablosu(List<CizimAnalizSonucu> liste) => @<table class="veri-tablo">
+        <thead>
+            <tr>
+                <th>Oda Adı</th>
+                <th>Alan (m²)</th>
+                <th>Kat</th>
+                <th>Kaynak</th>
+                <th>Güven</th>
+                <th>Önerilen Poz</th>
+                <th>Gerekçe / Model</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in liste)
+            {
+                var index = odaSonuclari.IndexOf(s);
+                var poz = s.OnerilenPozId.HasValue ? Veri.Pozlar.FirstOrDefault(p => p.Id == s.OnerilenPozId) : null;
+                <tr class="@(s.OnaylandiMi ? "satir-basarili" : (poz == null ? "satir-hatali" : ""))">
+                    <td>
+                        @if (s.OnaylandiMi)
+                        {
+                            @s.OdaAdi
+                        }
+                        else
+                        {
+                            <input type="text" @bind="s.OdaAdi" style="width:100%" />
+                        }
+                    </td>
+                    <td>
+                        @if (s.OnaylandiMi)
+                        {
+                            @s.AlanM2.ToString("0.00")
+                        }
+                        else
+                        {
+                            <input type="number" step="0.01" @bind="s.AlanM2" style="width:6rem" />
+                        }
+                    </td>
+                    <td>@(string.IsNullOrWhiteSpace(s.KatAdi) ? "—" : s.KatAdi)</td>
+                    <td>@KaynakEtiketi(s.KaynakTuru)</td>
+                    <td>@s.GuvenSkoru</td>
+                    <td>
+                        @if (poz != null)
+                        {
+                            @($"{poz.PozKodu} — {poz.Ad}")
+                        }
+                        else if (!s.OnaylandiMi)
+                        {
+                            <PozSecici Pozlar="Veri.Pozlar" @bind-SeciliPozId="s.SeciliPozId" />
+                        }
+                        else
+                        {
+                            @: —
+                        }
+                    </td>
+                    <td style="font-size:0.85rem">@s.OneriGerekcesi @(!string.IsNullOrEmpty(s.KullanilanModel) ? $"({s.KullanilanModel})" : "")</td>
+                    <td>
+                        @if (s.OnaylandiMi)
+                        {
+                            <span>✓ Eklendi</span>
+                            <button @onclick="() => OdaSonucuSil(s)">Sil</button>
+                        }
+                        else if (poz != null)
+                        {
+                            <button @onclick="() => OdaOnerisiOnayla(index)">Onayla ve Ekle</button>
+                        }
+                        else
+                        {
+                            <button @onclick="() => OdaOnerisiOnayla(index)" disabled="@(!s.SeciliPozId.HasValue)">Seç ve Ekle</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>;
 }
 
 @code {
@@ -269,8 +348,9 @@ else
     {
         if (proje == null) return;
         var s = odaSonuclari[index];
-        if (!s.OnerilenPozId.HasValue) return;
-        var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.OnerilenPozId);
+        var pozId = s.OnerilenPozId ?? s.SeciliPozId;
+        if (!pozId.HasValue) return;
+        var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == pozId);
         if (poz == null) return;
 
         await Veri.OdaAnalizSonucunuOnayla(proje, s, poz);
@@ -279,11 +359,40 @@ else
     private async Task TumunuOnayla()
     {
         if (proje == null) return;
-        foreach (var s in odaSonuclari.Where(s => !s.OnaylandiMi && s.OnerilenPozId.HasValue))
+        // Belirsiz (Düşük güven) satırlar toplu onaya dahil edilmez — Bölüm 5: kullanıcı bunları
+        // ayrı sekmede elle inceleyip onaylamalı.
+        foreach (var s in odaSonuclari.Where(s => !s.OnaylandiMi && s.OnerilenPozId.HasValue && s.GuvenSkoru != GuvenSkoru.Dusuk))
         {
             var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.OnerilenPozId);
             if (poz != null) await Veri.OdaAnalizSonucunuOnayla(proje, s, poz);
         }
+    }
+
+    private async Task OdaSonucuSil(CizimAnalizSonucu s)
+    {
+        if (proje == null || s.EklenenMetrajKalemiId is not { } id) return;
+        if (await Veri.MetrajKalemiSil(proje, id))
+        {
+            odaSonuclari.Remove(s);
+        }
+    }
+
+    private async Task ImportSatiriSil(ImportSonucSatiri s)
+    {
+        if (proje == null || s.EklenenMetrajKalemiId is not { } id) return;
+        if (await Veri.MetrajKalemiSil(proje, id))
+        {
+            importSonuclari.Remove(s);
+        }
+    }
+
+    private async Task ImportSatiriniPozIleTamamla(ImportSonucSatiri s)
+    {
+        if (proje == null || !s.SeciliPozId.HasValue) return;
+        var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.SeciliPozId);
+        if (poz == null) return;
+
+        await Veri.ImportSatiriniManuelPozIleTamamla(proje, s, poz);
     }
 
     private static string KaynakEtiketi(KaynakTuru kaynak) => kaynak switch

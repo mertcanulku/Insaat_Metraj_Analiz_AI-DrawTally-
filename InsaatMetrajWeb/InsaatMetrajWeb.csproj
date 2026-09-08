@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>InsaatMetrajWeb</RootNamespace>
+    <UserSecretsId>10a9c268-79e3-47e1-b000-2e2d4cb1583e</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +21,12 @@
     <!-- DWG/DXF çizim dosyalarını okumak için: ücretsiz, açık kaynak (MIT lisanslı), alpha aşamasında -->
     <PackageReference Include="ACadSharp" Version="1.4.0-alpha" />
     <PackageReference Include="PDFtoImage" Version="5.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ÇŞB 2026 rayiç/poz kütüphanesi seed verisi (bkz. Data/PozSeed) — ilk açılışta
+         veritabanı boşsa PozKutuphanesi.SeedVeYukleAsync tarafından okunur. -->
+    <Content Update="Data\PozSeed\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

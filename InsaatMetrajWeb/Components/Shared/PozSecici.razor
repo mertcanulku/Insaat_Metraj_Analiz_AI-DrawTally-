@@ -1,0 +1,81 @@
+@* Poz kütüphanesi binlerce kalem içerdiğinden (ÇŞB 2026 verisi) düz bir <select> ile
+   taranamaz hale gelir — bunun yerine kod/ad üzerinde arayan, en iyi eşleşen ilk
+   30 sonucu gösteren basit bir otomatik tamamlama kutusu. *@
+
+<div class="poz-secici">
+    <input type="text" class="poz-secici-input" placeholder="@Placeholder"
+           value="@aramaMetni"
+           @oninput="AramaDegisti"
+           @onfocus="() => listeAcik = true"
+           @onblur="GecikmeliKapat" />
+    @if (listeAcik && eslesenler.Count > 0)
+    {
+        <ul class="poz-secici-liste">
+            @foreach (var p in eslesenler)
+            {
+                <li @onmousedown="() => Sec(p)" @onmousedown:preventDefault="true">
+                    <strong>@p.PozKodu</strong> — @p.Ad
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    [Parameter] public List<Poz> Pozlar { get; set; } = new();
+    [Parameter] public int? SeciliPozId { get; set; }
+    [Parameter] public EventCallback<int?> SeciliPozIdChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Poz ara (kod veya ad yazın)...";
+
+    private string aramaMetni = "";
+    private List<Poz> eslesenler = new();
+    private bool listeAcik;
+    private int? sonYuklenenSeciliId;
+
+    protected override void OnParametersSet()
+    {
+        // Dışarıdan (ör. AI önerisiyle) SeciliPozId set edildiğinde arama kutusunu senkronize et.
+        if (SeciliPozId != sonYuklenenSeciliId)
+        {
+            sonYuklenenSeciliId = SeciliPozId;
+            var secili = SeciliPozId.HasValue ? Pozlar.FirstOrDefault(p => p.Id == SeciliPozId) : null;
+            aramaMetni = secili != null ? $"{secili.PozKodu} — {secili.Ad}" : "";
+        }
+    }
+
+    private void AramaDegisti(ChangeEventArgs e)
+    {
+        aramaMetni = e.Value?.ToString() ?? "";
+        listeAcik = true;
+
+        if (aramaMetni.Trim().Length < 2)
+        {
+            eslesenler = new();
+            return;
+        }
+
+        var t = aramaMetni.Trim();
+        eslesenler = Pozlar
+            .Where(p => p.PozKodu.Contains(t, StringComparison.OrdinalIgnoreCase) || p.Ad.Contains(t, StringComparison.OrdinalIgnoreCase))
+            .Take(30)
+            .ToList();
+    }
+
+    private async Task Sec(Poz p)
+    {
+        aramaMetni = $"{p.PozKodu} — {p.Ad}";
+        sonYuklenenSeciliId = p.Id;
+        listeAcik = false;
+        eslesenler = new();
+        SeciliPozId = p.Id;
+        await SeciliPozIdChanged.InvokeAsync(p.Id);
+    }
+
+    private async Task GecikmeliKapat()
+    {
+        // Liste öğesine tıklama (onmousedown) blur'dan önce işlense de, güvenlik payı için kısa bir gecikme.
+        await Task.Delay(150);
+        listeAcik = false;
+        StateHasChanged();
+    }
+}

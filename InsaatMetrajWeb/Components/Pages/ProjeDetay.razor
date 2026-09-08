@@ -34,6 +34,7 @@ else
                     <th>Miktar</th>
                     <th>Birim Fiyat</th>
                     <th>Tutar</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -46,6 +47,7 @@ else
                         <td>@k.Miktar.ToString("0.000")</td>
                         <td>@k.Poz.BirimMaliyet().ToString("N2")</td>
                         <td>@k.ToplamMaliyet().ToString("N2")</td>
+                        <td><button @onclick="() => KalemSil(k.Id)">Sil</button></td>
                     </tr>
                 }
             </tbody>
@@ -53,6 +55,7 @@ else
                 <tr>
                     <td colspan="5" style="text-align:right"><strong>GENEL TOPLAM</strong></td>
                     <td><strong>@proje.ToplamMaliyet().ToString("N2") TL</strong></td>
+                    <td></td>
                 </tr>
             </tfoot>
         </table>
@@ -67,6 +70,15 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        var sahipId = await AuthProvider.GetUserIdAsync();
+        proje = await Veri.ProjeBul(sahipId, ProjeId);
+    }
+
+    private async Task KalemSil(int metrajKalemiId)
+    {
+        if (proje == null) return;
+        await Veri.MetrajKalemiSil(proje, metrajKalemiId);
+
         var sahipId = await AuthProvider.GetUserIdAsync();
         proje = await Veri.ProjeBul(sahipId, ProjeId);
     }

@@ -22,8 +22,8 @@ public class NvidiaNimProvider : IAiClassificationProvider
 {
     // NIM kataloğundaki model adları — ihtiyaca göre appsettings üzerinden
     // değiştirilebilir hale getirilebilir; şimdilik makul varsayılanlar.
-    public string UcuzModel => "meta/llama-3.1-8b-instruct";
-    public string GucluModel => "meta/llama-3.1-70b-instruct";
+    public string UcuzModel => "meta/llama-3.2-11b-vision-instruct";
+    public string GucluModel => "meta/llama-3.2-11b-vision-instruct";
 
     private const string Endpoint = "https://integrate.api.nvidia.com/v1/chat/completions";
 

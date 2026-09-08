@@ -27,4 +27,18 @@ public class ImportSonucSatiri
     public bool Basarili { get; set; }
     public string Mesaj { get; set; } = "";
     public string EslesenPozKodu { get; set; } = "";
+
+    /// <summary>Eklenen metraj kaleminin veritabanı id'si — sonradan silinebilsin diye.</summary>
+    public int? EklenenMetrajKalemiId { get; set; }
+
+    /// <summary>
+    /// Poz bulunamadığı için başarısız olan ama ölçüm detayı/miktarı ayrıştırılabilmiş satırlar için true —
+    /// bu durumda kullanıcıya "poz seç" seçeneği sunulur, satır kalıcı olarak hatalı sayılmaz.
+    /// </summary>
+    public bool PozEksik { get; set; }
+    public string OlcumDetayiTaslak { get; set; } = "";
+    public decimal? MiktarTaslak { get; set; }
+
+    /// <summary>UI-only: kullanıcının "poz eksik" satırında dropdown'dan seçtiği poz — kalıcı veri değil.</summary>
+    public int? SeciliPozId { get; set; }
 }

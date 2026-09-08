@@ -7,6 +7,11 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// WebApplication.CreateBuilder yalnızca ASPNETCORE_ENVIRONMENT=Development iken
+// user-secrets'ı otomatik yükler; Production'da da (ör. bu demo dev sunucusunda)
+// yüklensin diye açıkça ekliyoruz — appsettings.json'a secret yazmaktan kaçınmak için.
+builder.Configuration.AddUserSecrets<Program>(optional: true);
+
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
 {
@@ -16,8 +21,12 @@ if (!string.IsNullOrEmpty(port))
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Poz/Rayiç kütüphanesi (ortak, bellek içi) + kullanıcıya özel projeler (veritabanı).
-// ApplicationDbContext scoped olduğu için VeriDeposu de scoped olmalı.
+// Poz/Rayiç/Alias kütüphanesi (ÇŞB verisi, tüm kullanıcılar arasında ortak) — uygulama
+// ömrü boyunca bir kez veritabanından yüklenip bellekte tutulur, bkz. aşağıdaki seed bloğu.
+builder.Services.AddSingleton<PozKutuphanesi>();
+
+// Kullanıcıya özel projeler veritabanından okunur; ApplicationDbContext scoped olduğu için
+// VeriDeposu de scoped olmalı (poz kütüphanesi kısmı yukarıdaki singleton'a delege eder).
 builder.Services.AddScoped<VeriDeposu>();
 
 // PDF/DWG çizim analizi (oda adı + alan çıkarımı): appsettings.json'daki "AiProvider"
@@ -85,6 +94,11 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     db.Database.Migrate();
+
+    // İlk açılışta (veya boş bir veritabanında) ÇŞB rayiç/poz kütüphanesini
+    // Data/PozSeed/*.json dosyalarından bir kez içe aktarır, ardından belleğe yükler.
+    var pozKutuphanesi = scope.ServiceProvider.GetRequiredService<PozKutuphanesi>();
+    await pozKutuphanesi.SeedVeYukleAsync(db, app.Environment.ContentRootPath);
 }
 
 if (!app.Environment.IsDevelopment())

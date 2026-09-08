@@ -239,6 +239,18 @@ button:hover { background: #184A6E; }
 .hata-mesaj { color: var(--warn); font-weight: 600; font-size: 0.9rem; }
 p.hata-mesaj, p.basarili-mesaj { max-width: none; }
 
+.disiplin-etiket {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--accent, #184A6E);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
 ul { color: var(--ink-soft); padding-left: 20px; }
 ul li { margin-bottom: 6px; }
 
@@ -338,3 +350,44 @@ ul li { margin-bottom: 6px; }
     box-sizing: border-box;
 }
 .sidebar-user .cikis-linki:hover { background: var(--paper); color: var(--ink); }
+
+/* ==========================================================================
+   PozSecici — 14binin üzerinde poz içeren kütüphanede aranabilir seçim kutusu
+   ========================================================================== */
+.poz-secici { position: relative; display: inline-block; min-width: 22rem; max-width: 100%; }
+.poz-secici-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--sheet);
+    box-sizing: border-box;
+}
+.poz-secici-input:focus { outline: none; border-color: var(--accent); }
+.poz-secici-liste {
+    position: absolute;
+    z-index: 20;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 16rem;
+    overflow-y: auto;
+    margin: 2px 0 0;
+    padding: 0;
+    list-style: none;
+    background: var(--sheet);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 10px rgba(22, 36, 43, 0.12);
+}
+.poz-secici-liste li {
+    padding: 6px 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--line-soft);
+}
+.poz-secici-liste li:last-child { border-bottom: none; }
+.poz-secici-liste li:hover { background: var(--accent-soft); }
