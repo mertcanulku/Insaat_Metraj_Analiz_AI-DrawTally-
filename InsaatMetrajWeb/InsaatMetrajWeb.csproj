@@ -19,6 +19,7 @@
     <PackageReference Include="PdfPig" Version="0.1.9" />
     <!-- DWG/DXF çizim dosyalarını okumak için: ücretsiz, açık kaynak (MIT lisanslı), alpha aşamasında -->
     <PackageReference Include="ACadSharp" Version="1.4.0-alpha" />
+    <PackageReference Include="PDFtoImage" Version="5.4.0" />
   </ItemGroup>
 
 </Project>

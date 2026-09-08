@@ -20,8 +20,11 @@ builder.Services.AddRazorComponents()
 // ApplicationDbContext scoped olduğu için VeriDeposu de scoped olmalı.
 builder.Services.AddScoped<VeriDeposu>();
 
-// DWG/DXF katman sınıflandırması için Claude API'sine bağlanan servis.
+// PDF/DWG çizim analizi (oda adı + alan çıkarımı) için Claude API'sine bağlanan servis.
 builder.Services.AddHttpClient<AiSiniflandirmaServisi>();
+
+// PDF/DWG çizimlerinden oda/alan çıkaran ortak analiz servisi (AiSiniflandirmaServisi + VeriDeposu üzerine kurulu).
+builder.Services.AddScoped<CizimAnalizServisi>();
 
 // --- Kullanıcı hesapları (ASP.NET Core Identity + SQLite) ---
 builder.Services.AddScoped<IdentityRedirectManager>();

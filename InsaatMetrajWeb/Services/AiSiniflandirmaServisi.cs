@@ -5,7 +5,8 @@ using InsaatMetrajWeb.Models;
 namespace InsaatMetrajWeb.Services;
 
 /// <summary>
-/// Bir CAD katmanının hangi poza karşılık geldiğini Claude API ile sınıflandırır.
+/// Bir PDF/DWG çiziminden çıkarılan metin kümesini veya görsel kırpmayı Claude API
+/// ile yapılandırılmış oda bilgisine ({oda adı, alan, kat}) ve önerilen poza çevirir.
 ///
 /// Strateji: önce ucuz/hızlı model (Haiku 4.5) sorulur. Modelin kendi döndürdüğü
 /// güven skoru belirlenen eşiğin (GuvenEsigi) altındaysa, aynı soru daha güçlü bir
@@ -17,7 +18,9 @@ namespace InsaatMetrajWeb.Services;
 /// (dotnet user-secrets) şu anahtarı eklemen gerekiyor:
 ///   "Anthropic": { "ApiKey": "sk-ant-..." }
 /// API anahtarını asla appsettings.json'a commit etme — user-secrets veya
-/// ortam değişkeni (ANTHROPIC_API_KEY) kullan.
+/// ortam değişkeni (ANTHROPIC_API_KEY) kullan. Anahtar tanımlı değilse bu servis
+/// no-op döner (Guven=0, PozId=null) — çağıran taraf çizim analizini kullanıcıya
+/// elle işaretlenmek üzere sunar, uygulama anahtarsız da çalışır/derlenir.
 /// </summary>
 public class AiSiniflandirmaServisi
 {
@@ -34,22 +37,31 @@ public class AiSiniflandirmaServisi
         _apiKey = config["Anthropic:ApiKey"] ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
     }
 
-    public async Task<AiKatmanSinifi> SiniflandirAsync(CizimKatmanSinyali katman, List<Poz> pozlar)
+    public bool ApiAnahtariTanimliMi => !string.IsNullOrWhiteSpace(_apiKey);
+
+    private static readonly OdaYapilandirmaSonucu YapilandirilmadiSonucu = new()
     {
-        if (string.IsNullOrWhiteSpace(_apiKey))
-        {
-            return new AiKatmanSinifi
-            {
-                PozId = null,
-                Guven = 0,
-                Gerekce = "Anthropic API anahtarı tanımlı değil. appsettings.json'da Anthropic:ApiKey veya ANTHROPIC_API_KEY ortam değişkenini ayarla.",
-                KullanilanModel = "yapılandırılmadı"
-            };
-        }
+        Guven = 0,
+        Gerekce = "Anthropic API anahtarı tanımlı değil. appsettings.json'da Anthropic:ApiKey veya ANTHROPIC_API_KEY ortam değişkenini ayarla.",
+        KullanilanModel = "yapılandırılmadı"
+    };
+
+    /// <summary>Bir metin kümesini (ör. bir PDF sayfasında birbirine yakın "oda adı" + "alan: X m²" satırları) yapılandırılmış oda bilgisine çevirir.</summary>
+    public Task<OdaYapilandirmaSonucu> MetinKumesindenOdaCikarAsync(string metinKumesi, List<Poz> pozlar)
+        => HibritSiniflandirAsync(pozlar, model => TekModelIleMetinSiniflandirAsync(model, metinKumesi, pozlar));
+
+    /// <summary>Metin katmanı yoksa/yetersizse (taranmış PDF, patlatılmış DWG metni) sayfa/bölge görselini doğrudan yapay zeka görüşüne gönderir.</summary>
+    public Task<OdaYapilandirmaSonucu> GorseldenOdaCikarAsync(byte[] pngGorsel, List<Poz> pozlar)
+        => HibritSiniflandirAsync(pozlar, model => TekModelIleGorselSiniflandirAsync(model, pngGorsel, pozlar));
+
+    private async Task<OdaYapilandirmaSonucu> HibritSiniflandirAsync(List<Poz> pozlar, Func<string, Task<OdaYapilandirmaSonucu>> tekModelCagir)
+    {
+        if (!ApiAnahtariTanimliMi)
+            return YapilandirilmadiSonucu;
 
         try
         {
-            var haikuSonuc = await TekModelIleSiniflandirAsync(HaikuModel, katman, pozlar);
+            var haikuSonuc = await tekModelCagir(HaikuModel);
 
             if (haikuSonuc.Guven >= GuvenEsigi)
             {
@@ -58,7 +70,7 @@ public class AiSiniflandirmaServisi
             }
 
             // Haiku'nun güveni düşük -> daha güçlü modele yükselt
-            var sonnetSonuc = await TekModelIleSiniflandirAsync(SonnetModel, katman, pozlar);
+            var sonnetSonuc = await tekModelCagir(SonnetModel);
             sonnetSonuc.KullanilanModel = $"Sonnet 5 (Haiku güveni yetersizdi: %{haikuSonuc.Guven})";
             return sonnetSonuc;
         }
@@ -67,9 +79,8 @@ public class AiSiniflandirmaServisi
             // Ağ hatası, zaman aşımı, beklenmeyen API yanıtı vb. — sessizce
             // yanlış bir şey eklemek yerine "sınıflandırılamadı" olarak raporla,
             // kullanıcı elle karar versin.
-            return new AiKatmanSinifi
+            return new OdaYapilandirmaSonucu
             {
-                PozId = null,
                 Guven = 0,
                 Gerekce = $"AI sınıflandırma sırasında hata oluştu: {ex.Message}",
                 KullanilanModel = "hata"
@@ -77,43 +88,59 @@ public class AiSiniflandirmaServisi
         }
     }
 
-    private async Task<AiKatmanSinifi> TekModelIleSiniflandirAsync(string model, CizimKatmanSinyali katman, List<Poz> pozlar)
+    private static string SistemPrompt(List<Poz> pozlar)
     {
         var pozListesi = string.Join("\n", pozlar.Select(p => $"- id:{p.Id} kod:{p.PozKodu} ad:\"{p.Ad}\" birim:{p.Birim}"));
 
-        var sistemPrompt = $$"""
-            Sen bir inşaat metraj uzmanısın. Sana bir CAD çizimindeki bir katmanın
-            (layer) adı ve geometrik özellikleri verilecek. Görevin bu katmanın
-            aşağıdaki poz listesinden hangisine karşılık geldiğini tahmin etmek.
-            Katman ismi güvenilmez olabilir (kısaltma, yabancı dil, anlamsız kod) —
-            asıl karar verici geometrik özellikler olmalı: kapalı bir poligon ve
-            kareye yakın şekil genelde döşeme/temel betonunu, kapalı olmayan ve
-            10-40cm kalınlığında bir hat genelde duvarı işaret eder.
+        return $$"""
+            Sen bir inşaat metraj uzmanısın. Sana bir mimari çizimden (PDF veya DWG)
+            alınmış bir oda etiketi/metin kümesi ya da o bölgenin görseli verilecek.
+            Görevin: oda adını, alanını (m²) ve varsa kat/seviye adını çıkarmak, ayrıca
+            aşağıdaki poz listesinden bu odaya en uygun kalemi (ör. döşeme kaplaması)
+            önermek.
 
             Poz listesi:
             {{pozListesi}}
 
             SADECE şu JSON formatında cevap ver, başka hiçbir açıklama ekleme:
-            {"pozId": <uygun poz id'si veya null>, "guven": <0-100 arası tam sayı>, "gerekce": "<tek cümlelik kısa gerekçe>"}
+            {"odaAdi": "<oda adı>", "alanM2": <sayı veya null>, "kat": "<kat adı veya \"\">", "pozId": <uygun poz id'si veya null>, "guven": <0-100 arası tam sayı>, "gerekce": "<tek cümlelik kısa gerekçe>"}
             """;
+    }
 
-        var kullaniciMesaji = $"""
-            Katman adı: "{katman.LayerAdi}"
-            Entity sayısı: {katman.EntitySayisi}
-            Kapalı poligon mu: {(katman.KapaliMi ? "evet" : "hayır")}
-            Ortalama segment uzunluğu: {katman.OrtSegmentUzunlugu:0.0} m
-            Çizgi kalınlığı: {katman.CizgiKalinligi:0.00} m
-            En/boy oranı: {katman.EnBoyOrani:0.0}
-            Toplam uzunluk: {katman.ToplamUzunluk:0.0} m
-            Toplam alan: {katman.ToplamAlan:0.0} m2
-            """;
+    private async Task<OdaYapilandirmaSonucu> TekModelIleMetinSiniflandirAsync(string model, string metinKumesi, List<Poz> pozlar)
+    {
+        var kullaniciMesaji = new object[]
+        {
+            new { type = "text", text = $"Çizimden çıkarılan metin kümesi:\n{metinKumesi}" }
+        };
 
+        return await IstekGonderVeYorumlaAsync(model, SistemPrompt(pozlar), kullaniciMesaji);
+    }
+
+    private async Task<OdaYapilandirmaSonucu> TekModelIleGorselSiniflandirAsync(string model, byte[] pngGorsel, List<Poz> pozlar)
+    {
+        var base64Gorsel = Convert.ToBase64String(pngGorsel);
+        var kullaniciMesaji = new object[]
+        {
+            new { type = "text", text = "Çizimin bu bölgesinin görseli aşağıda. Metin katmanı yoktu veya yetersizdi, bu yüzden görsele bakarak yorumla." },
+            new
+            {
+                type = "image",
+                source = new { type = "base64", media_type = "image/png", data = base64Gorsel }
+            }
+        };
+
+        return await IstekGonderVeYorumlaAsync(model, SistemPrompt(pozlar), kullaniciMesaji);
+    }
+
+    private async Task<OdaYapilandirmaSonucu> IstekGonderVeYorumlaAsync(string model, string sistemPrompt, object[] kullaniciIcerik)
+    {
         var istekGovdesi = new
         {
             model,
-            max_tokens = 300,
+            max_tokens = 400,
             system = sistemPrompt,
-            messages = new[] { new { role = "user", content = kullaniciMesaji } }
+            messages = new[] { new { role = "user", content = kullaniciIcerik } }
         };
 
         using var istek = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages");
@@ -121,7 +148,7 @@ public class AiSiniflandirmaServisi
         istek.Headers.Add("anthropic-version", "2023-06-01");
         istek.Content = new StringContent(JsonSerializer.Serialize(istekGovdesi), Encoding.UTF8, "application/json");
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var cevap = await _http.SendAsync(istek, cts.Token);
         var cevapMetni = await cevap.Content.ReadAsStringAsync();
 
@@ -135,17 +162,29 @@ public class AiSiniflandirmaServisi
         var baslangic = metinIcerik.IndexOf('{');
         var bitis = metinIcerik.LastIndexOf('}');
         if (baslangic < 0 || bitis < 0 || bitis <= baslangic)
-            return new AiKatmanSinifi { PozId = null, Guven = 0, Gerekce = "Model geçerli bir JSON döndürmedi: " + metinIcerik };
+            return new OdaYapilandirmaSonucu { Guven = 0, Gerekce = "Model geçerli bir JSON döndürmedi: " + metinIcerik };
 
         var jsonKismi = metinIcerik.Substring(baslangic, bitis - baslangic + 1);
         using var sonucDoc = JsonDocument.Parse(jsonKismi);
         var root = sonucDoc.RootElement;
 
+        string odaAdi = root.TryGetProperty("odaAdi", out var odaAdiEl) ? odaAdiEl.GetString() ?? "" : "";
+        decimal? alanM2 = root.TryGetProperty("alanM2", out var alanEl) && alanEl.ValueKind != JsonValueKind.Null
+            ? alanEl.GetDecimal() : null;
+        string kat = root.TryGetProperty("kat", out var katEl) ? katEl.GetString() ?? "" : "";
         int? pozId = root.TryGetProperty("pozId", out var pozIdEl) && pozIdEl.ValueKind != JsonValueKind.Null
             ? pozIdEl.GetInt32() : null;
         int guven = root.TryGetProperty("guven", out var guvenEl) ? guvenEl.GetInt32() : 0;
         string gerekce = root.TryGetProperty("gerekce", out var gerekceEl) ? gerekceEl.GetString() ?? "" : "";
 
-        return new AiKatmanSinifi { PozId = pozId, Guven = guven, Gerekce = gerekce };
+        return new OdaYapilandirmaSonucu
+        {
+            OdaAdi = odaAdi,
+            AlanM2 = alanM2,
+            KatAdi = kat,
+            OnerilenPozId = pozId,
+            Guven = guven,
+            Gerekce = gerekce
+        };
     }
 }
