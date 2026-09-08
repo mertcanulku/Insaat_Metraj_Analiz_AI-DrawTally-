@@ -78,7 +78,7 @@ public class CizimAnalizServisi
                 // Taranmış (resim) sayfa — metin katmanı yok, doğrudan görsele bak.
                 var gorsel = SayfaGorseliOlustur(pdfBaytlari, sayfaVerisi.SayfaNo, sayfaVerisi.Genislik, sayfaVerisi.Yukseklik, kirpma: null);
                 var oda = await _ai.GorseldenOdaCikarAsync(gorsel, _veri.Pozlar, disiplin);
-                sonuclar.Add(SonucaCevir(oda, KaynakTuru.AIGorsel, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin));
+                sonuclar.Add(SonucaCevir(oda, KaynakTuru.AIGorsel, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi));
                 continue;
             }
 
@@ -109,14 +109,14 @@ public class CizimAnalizServisi
                     }
                 }
 
-                sonuclar.Add(SonucaCevir(oda, kaynak, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin));
+                sonuclar.Add(SonucaCevir(oda, kaynak, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi));
             }
         }
 
         return sonuclar;
     }
 
-    private static CizimAnalizSonucu SonucaCevir(OdaYapilandirmaSonucu oda, KaynakTuru kaynak, string varsayilanKat, ProjeDisiplini disiplin)
+    private static CizimAnalizSonucu SonucaCevir(OdaYapilandirmaSonucu oda, KaynakTuru kaynak, string varsayilanKat, ProjeDisiplini disiplin, string dosyaAdi)
     {
         return new CizimAnalizSonucu
         {
@@ -128,7 +128,8 @@ public class CizimAnalizServisi
             OnerilenPozId = oda.OnerilenPozId,
             OneriGerekcesi = oda.Gerekce,
             KullanilanModel = oda.KullanilanModel,
-            Disiplin = disiplin
+            Disiplin = disiplin,
+            KaynakDosya = dosyaAdi
         };
     }
 
@@ -224,10 +225,16 @@ public class CizimAnalizServisi
     // ---------------------------------------------------------------- DWG ----
 
     /// <summary>
-    /// NOT: ACadSharp kütüphanesi henüz alpha aşamasında; bu ilk sürüm kapalı
-    /// LwPolyline/Polyline2D için alan hesabı ve TextEntity/MText için metin
-    /// eşleştirmesi yapar. Hatch entity'lerinin sınır yolları (çizgi/yay/spline
-    /// karışımı olabilir) bu sürümde işlenmiyor — ileride eklenebilir.
+    /// NOT: ACadSharp kütüphanesi henüz alpha aşamasında. Bu sürüm üç ayrı geometrik
+    /// yolu aynı pasoda işler (bir DWG'de hepsi bir arada bulunabilir):
+    /// (1) kapalı LwPolyline/Polyline2D → alan (shoelace) + en yakın TEXT/MTEXT eşleştirmesi
+    ///     (Mimari/Isıtma/Sıhhi çizimlerde oda/alan sınırları için tipik),
+    /// (2) Insert (blok referansı) + Attrib → (BlockName, Katman) bazında adet sayımı
+    ///     (Statik'te kolon/kiriş, Elektrik'te priz/anahtar/pano gibi sembolik elemanlar için tipik),
+    /// (3) Line + açık polyline → katman bazında toplam uzunluk (sadece Elektrik disiplininde,
+    ///     kablo/hat metrajı için).
+    /// Hatch entity'lerinin sınır yolları (çizgi/yay/spline karışımı olabilir) ve kolon/donatı
+    /// cetveli metin tabloları bu sürümde işlenmiyor — ileride eklenebilir.
     /// </summary>
     public List<CizimAnalizSonucu> DwgAnalizEt(Stream dosyaStream, string dosyaAdi)
     {
@@ -239,27 +246,67 @@ public class CizimAnalizServisi
 
         var metinler = new List<(string Deger, double X, double Y, string Katman)>();
         var poligonlar = new List<(List<(double X, double Y)> Noktalar, string Katman)>();
+        // Statik/Elektrik disiplinlerde kolon/kiriş, priz/anahtar/pano gibi elemanlar kapalı poligon değil,
+        // blok referansı (Insert) olarak modellenir — adet bazlı sayım için bkz. Bölüm (blok sayımı).
+        var bloklar = new List<(string BlockName, double X, double Y, string Katman, List<(string Etiket, string Deger)> Oznitelikler)>();
+        // Elektrik hat/kablo gibi elemanlar Line veya açık (kapalı olmayan) polyline olarak çizilir —
+        // katman bazında toplam uzunluk hesabı için bkz. Bölüm (kablo/hat uzunluğu).
+        var cizgiler = new List<(double Uzunluk, string Katman)>();
 
         foreach (var entity in modelSpace.Entities)
         {
-            var katmanAdi = entity.Layer?.Name ?? "0";
-            switch (entity)
+            // ACadSharp henüz alpha aşamasında — bazı entity'lerde (özellikle XREF'e bağlı ya da
+            // bozuk/eksik referanslı Insert'lerde) iç property getter'ları null referans fırlatabilir.
+            // Tek bir bozuk entity yüzünden dosyanın tamamının analizi çökmesin diye, her entity
+            // ayrı ayrı korunur; sorunlu olan atlanır, geri kalanı işlenmeye devam eder.
+            try
             {
-                case TextEntity metin when !string.IsNullOrWhiteSpace(metin.Value):
-                    metinler.Add((metin.Value.Trim(), metin.InsertPoint.X, metin.InsertPoint.Y, katmanAdi));
-                    break;
+                var katmanAdi = entity.Layer?.Name ?? "0";
+                switch (entity)
+                {
+                    case TextEntity metin when !string.IsNullOrWhiteSpace(metin.Value):
+                        metinler.Add((metin.Value.Trim(), metin.InsertPoint.X, metin.InsertPoint.Y, katmanAdi));
+                        break;
 
-                case MText metin when !string.IsNullOrWhiteSpace(metin.Value):
-                    metinler.Add((MTextTemizle(metin.Value), metin.InsertPoint.X, metin.InsertPoint.Y, katmanAdi));
-                    break;
+                    case MText metin when !string.IsNullOrWhiteSpace(metin.Value):
+                        metinler.Add((MTextTemizle(metin.Value), metin.InsertPoint.X, metin.InsertPoint.Y, katmanAdi));
+                        break;
 
-                case LwPolyline lw when lw.IsClosed && lw.Vertices.Count >= 3:
-                    poligonlar.Add((lw.Vertices.Select(v => ((double)v.Location.X, (double)v.Location.Y)).ToList(), katmanAdi));
-                    break;
+                    case LwPolyline lw when lw.IsClosed && lw.Vertices.Count >= 3:
+                        poligonlar.Add((lw.Vertices.Select(v => ((double)v.Location.X, (double)v.Location.Y)).ToList(), katmanAdi));
+                        break;
 
-                case Polyline2D pl when pl.IsClosed && pl.Vertices.Count >= 3:
-                    poligonlar.Add((pl.Vertices.Select(v => ((double)v.Location.X, (double)v.Location.Y)).ToList(), katmanAdi));
-                    break;
+                    case LwPolyline lw when !lw.IsClosed && lw.Vertices.Count >= 2:
+                        cizgiler.Add((AcikPolilenkUzunluk(lw.Vertices.Select(v => ((double)v.Location.X, (double)v.Location.Y)).ToList()), katmanAdi));
+                        break;
+
+                    case Polyline2D pl when pl.IsClosed && pl.Vertices.Count >= 3:
+                        poligonlar.Add((pl.Vertices.Select(v => ((double)v.Location.X, (double)v.Location.Y)).ToList(), katmanAdi));
+                        break;
+
+                    case Polyline2D pl when !pl.IsClosed && pl.Vertices.Count >= 2:
+                        cizgiler.Add((AcikPolilenkUzunluk(pl.Vertices.Select(v => ((double)v.Location.X, (double)v.Location.Y)).ToList()), katmanAdi));
+                        break;
+
+                    case Line line:
+                        cizgiler.Add((Mesafe(((double)line.StartPoint.X, (double)line.StartPoint.Y), ((double)line.EndPoint.X, (double)line.EndPoint.Y)), katmanAdi));
+                        break;
+
+                    // "*" ile başlayan blok adları AutoCAD'in anonim (kullanıcı tarafından adlandırılmamış)
+                    // blokları — ölçülendirme (dimension), tarama (hatch) veya ilişkisel dizi (array)
+                    // için otomatik üretilir, gerçek bir sembol/eleman değildir; sayıma dahil edilmez.
+                    case Insert insert when !(insert.Block?.Name ?? "").StartsWith('*'):
+                        var oznitelikler = (insert.Attributes ?? Enumerable.Empty<AttributeEntity>())
+                            .Where(a => !string.IsNullOrWhiteSpace(a.Value) && !CizimGurultuFiltresi.GurultuMu(a.Value))
+                            .Select(a => (Etiket: a.Tag ?? "", Deger: a.Value.Trim()))
+                            .ToList();
+                        bloklar.Add((insert.Block?.Name ?? "(isimsiz blok)", (double)insert.InsertPoint.X, (double)insert.InsertPoint.Y, katmanAdi, oznitelikler));
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"DWG entity atlandı ({entity.GetType().Name}, handle {entity.Handle}): {ex.Message}");
             }
         }
 
@@ -276,71 +323,195 @@ public class CizimAnalizServisi
         bool metinPatlatilmisOlabilir = poligonlar.Count > 0 && metinler.Count < poligonlar.Count * 0.3;
 
         // Bölüm 4 — disiplin tespiti: DWG'de en güçlü sinyal katman adları (4.1.2), ek olarak metinler.
-        var katmanAdlari = poligonlar.Select(p => p.Katman).Concat(metinler.Select(m => m.Katman)).Distinct().ToList();
+        // Statik/Elektrik çizimlerde katman sinyali çoğunlukla sadece blok (Insert) ve çizgi (Line)
+        // katmanlarında bulunur (poligon/metin hiç olmayabilir), o yüzden onlar da dahil edilir.
+        var katmanAdlari = poligonlar.Select(p => p.Katman)
+            .Concat(metinler.Select(m => m.Katman))
+            .Concat(bloklar.Select(b => b.Katman))
+            .Concat(cizgiler.Select(c => c.Katman))
+            .Distinct().ToList();
         var disiplin = DisiplinTespitServisi.TespitEt(metinler.Select(m => m.Deger), katmanAdlari);
 
         var sonuclar = new List<CizimAnalizSonucu>();
-        foreach (var (noktalar, katman) in poligonlar)
+        // Statik/Elektrik çizimlerde kapalı bir poligon "oda" değildir — kolon kesiti, pano kutusu,
+        // tarama sınırı gibi şeyler de kapalı poligon olarak çizilir. Bu disiplinlerde alan (m²)
+        // sonucu üretmek anlamsız/gürültü demektir; adet (blok sayımı) ve uzunluk (kablo/hat) zaten
+        // ayrı yollardan üretiliyor. Alan yolu sadece oda/alan kavramının anlamlı olduğu Mimari/
+        // Isıtma/Sıhhi'de (ve disiplin tespit edilemediyse, güvenli varsayılan olarak) çalışır.
+        bool alanYoluGecerli = disiplin != ProjeDisiplini.Statik && disiplin != ProjeDisiplini.Elektrik;
+        if (alanYoluGecerli)
         {
-            var alan = ShoelaceAlan(noktalar);
-            if (alan < 0.01) continue; // gürültü / dejenere poligon
-
-            var merkez = AgirlikMerkezi(noktalar);
-            var enYakin = metinler
-                .Select(m => (Metin: m, Uzaklik: Mesafe(merkez, (m.X, m.Y))))
-                .OrderBy(x => x.Uzaklik)
-                .FirstOrDefault();
-
-            var araMesafesi = Math.Sqrt(alan) * 2; // alanla orantılı arama yarıçapı
-            string odaAdi;
-            GuvenSkoru guven;
-            if (enYakin.Metin.Deger != null && enYakin.Uzaklik <= araMesafesi)
+            foreach (var (noktalar, katman) in poligonlar)
             {
-                odaAdi = enYakin.Metin.Deger;
-                guven = metinPatlatilmisOlabilir ? GuvenSkoru.Orta : GuvenSkoru.Yuksek;
+                var alan = ShoelaceAlan(noktalar);
+                if (alan < 0.01) continue; // gürültü / dejenere poligon
+
+                var merkez = AgirlikMerkezi(noktalar);
+                var enYakin = metinler
+                    .Select(m => (Metin: m, Uzaklik: Mesafe(merkez, (m.X, m.Y))))
+                    .OrderBy(x => x.Uzaklik)
+                    .FirstOrDefault();
+
+                var araMesafesi = Math.Sqrt(alan) * 2; // alanla orantılı arama yarıçapı
+                string odaAdi;
+                GuvenSkoru guven;
+                if (enYakin.Metin.Deger != null && enYakin.Uzaklik <= araMesafesi)
+                {
+                    odaAdi = enYakin.Metin.Deger;
+                    guven = metinPatlatilmisOlabilir ? GuvenSkoru.Orta : GuvenSkoru.Yuksek;
+                }
+                else
+                {
+                    odaAdi = $"(İsimsiz alan — katman: {katman})";
+                    guven = GuvenSkoru.Dusuk;
+                }
+
+                sonuclar.Add(new CizimAnalizSonucu
+                {
+                    OdaAdi = odaAdi,
+                    AlanM2 = Math.Round((decimal)alan, 2),
+                    KatAdi = "",
+                    KaynakTuru = KaynakTuru.VektorGeometri,
+                    GuvenSkoru = guven,
+                    OneriGerekcesi = metinPatlatilmisOlabilir
+                        ? "Alan shoelace formülüyle deterministik hesaplandı. Çizimde gerçek TEXT/MTEXT azlığı, metnin poligonlara patlatılmış (exploded) olabileceğini gösteriyor — oda adı en yakın metne göre tahmin edildi, elle doğrulayın."
+                        : "Alan shoelace formülüyle deterministik hesaplandı, oda adı en yakın metin etiketiyle eşleştirildi.",
+                    KullanilanModel = "geometrik (shoelace + en-yakın-metin)",
+                    Disiplin = disiplin,
+                    KaynakDosya = dosyaAdi
+                });
             }
-            else
-            {
-                odaAdi = $"(İsimsiz alan — katman: {katman})";
-                guven = GuvenSkoru.Dusuk;
-            }
+        }
+
+        // Blok (Insert) sayımı — Statik'te kolon/kiriş, Elektrik'te priz/anahtar/pano gibi elemanlar
+        // kapalı poligon değil blok referansı olarak modellenir; (BlockName, Katman) bazında gruplanıp
+        // adet olarak deterministik sayılır. Mimari/Isıtma/Sıhhi çizimlerde de bir blok bulunursa
+        // (ör. kapı/pencere sembolleri) aynı şekilde sayılır — bu, poligon yoluna ek, onun yerine değil.
+        var blokGruplari = bloklar.GroupBy(b => (b.BlockName, b.Katman));
+        foreach (var grup in blokGruplari)
+        {
+            var adet = grup.Count();
+            var ornekOznitelik = grup.SelectMany(b => b.Oznitelikler).FirstOrDefault(o => !string.IsNullOrWhiteSpace(o.Deger));
+            var odaAdi = string.IsNullOrWhiteSpace(ornekOznitelik.Deger)
+                ? grup.Key.BlockName
+                : $"{grup.Key.BlockName}: {ornekOznitelik.Deger}";
 
             sonuclar.Add(new CizimAnalizSonucu
             {
                 OdaAdi = odaAdi,
-                AlanM2 = Math.Round((decimal)alan, 2),
+                Adet = adet,
                 KatAdi = "",
-                KaynakTuru = KaynakTuru.VektorGeometri,
-                GuvenSkoru = guven,
-                OneriGerekcesi = metinPatlatilmisOlabilir
-                    ? "Alan shoelace formülüyle deterministik hesaplandı. Çizimde gerçek TEXT/MTEXT azlığı, metnin poligonlara patlatılmış (exploded) olabileceğini gösteriyor — oda adı en yakın metne göre tahmin edildi, elle doğrulayın."
-                    : "Alan shoelace formülüyle deterministik hesaplandı, oda adı en yakın metin etiketiyle eşleştirildi.",
-                KullanilanModel = "geometrik (shoelace + en-yakın-metin)",
-                Disiplin = disiplin
+                KaynakTuru = KaynakTuru.BlokSayimi,
+                GuvenSkoru = GuvenSkoru.Yuksek,
+                OneriGerekcesi = $"Katman \"{grup.Key.Katman}\" üzerindeki blok (Insert) referansları deterministik olarak sayıldı.",
+                KullanilanModel = "geometrik (blok sayımı)",
+                Disiplin = disiplin,
+                KaynakDosya = dosyaAdi
             });
+        }
+
+        // Kablo/hat uzunluğu — sadece Elektrik disiplininde anlamlı bir metrajdır (aksi halde çizim
+        // içindeki her sıradan Line/açık polyline gereksiz satırlar üretir).
+        if (disiplin == ProjeDisiplini.Elektrik)
+        {
+            var kabloGruplari = cizgiler
+                .GroupBy(c => c.Katman)
+                .Select(g => (Katman: g.Key, ToplamUzunluk: g.Sum(c => c.Uzunluk)))
+                .Where(g => g.ToplamUzunluk > 0.01);
+
+            foreach (var grup in kabloGruplari)
+            {
+                sonuclar.Add(new CizimAnalizSonucu
+                {
+                    OdaAdi = $"Kablo/Hat: {grup.Katman}",
+                    Uzunluk = Math.Round((decimal)grup.ToplamUzunluk, 2),
+                    KatAdi = "",
+                    KaynakTuru = KaynakTuru.VektorGeometri,
+                    GuvenSkoru = GuvenSkoru.Yuksek,
+                    OneriGerekcesi = $"Katman \"{grup.Katman}\" üzerindeki Line/açık polyline segmentlerinin toplam uzunluğu deterministik hesaplandı.",
+                    KullanilanModel = "geometrik (çizgi uzunluğu toplamı)",
+                    Disiplin = disiplin,
+                    KaynakDosya = dosyaAdi
+                });
+            }
         }
 
         return sonuclar;
     }
 
-    /// <summary>Katman adı + geometrik sinyalleri (kapalılık, alan) AI hibrit sınıflandırmaya vererek her odaya bir poz önerisi ekler.</summary>
-    public async Task DwgPozOnerileriniEkleAsync(List<CizimAnalizSonucu> odalar, string dosyaAdi)
+    // Tek bir DWG onlarca satır (kolon/priz adedi, kablo hattı, oda) üretebilir; her satır için AI
+    // isteği 2-20+ saniye sürebiliyor. Sırayla (tek tek) çalıştırılırsa toplam süre kolayca 5-15+
+    // dakikaya çıkıyor ve UI'da tek bir sabit mesaj olduğundan kullanıcıya "takılı kaldı" gibi
+    // görünüyor. Sınırlı paralellikle (aynı anda en fazla bu kadar istek) hem toplam süre kısalır
+    // hem de her istek bittiğinde ilerlemeRaporu ile arayüz güncellenebilir.
+    private const int AiEsZamanliIstekLimiti = 4;
+
+    /// <summary>Katman adı + geometrik sinyalleri (kapalılık, alan) AI hibrit sınıflandırmaya vererek her odaya bir poz önerisi ekler.
+    /// <paramref name="ilerlemeRaporu"/> verilirse her satır tamamlandığında (Tamamlanan, Toplam) raporlanır — UI'da ilerleme göstermek için.</summary>
+    public async Task DwgPozOnerileriniEkleAsync(List<CizimAnalizSonucu> odalar, string dosyaAdi, IProgress<(int Tamamlanan, int Toplam)>? ilerlemeRaporu = null)
     {
-        foreach (var oda in odalar)
+        int tamamlanan = 0;
+        using var esZamanlilikSiniri = new SemaphoreSlim(AiEsZamanliIstekLimiti);
+
+        async Task TekSatirIsle(CizimAnalizSonucu oda)
         {
-            var baglam = $"Kaynak: DWG çizimi ({dosyaAdi})\nOda/alan adı: {oda.OdaAdi}\nKat: {(string.IsNullOrWhiteSpace(oda.KatAdi) ? "belirtilmemiş" : oda.KatAdi)}\nAlan: {oda.AlanM2} m2\nGeometri: kapalı poligon (shoelace ile deterministik hesaplandı)";
-            var oneri = await _ai.MetinKumesindenOdaCikarAsync(baglam, _veri.Pozlar, oda.Disiplin);
-            oda.OnerilenPozId = oneri.OnerilenPozId;
-            oda.OneriGerekcesi = string.IsNullOrWhiteSpace(oneri.Gerekce) ? oda.OneriGerekcesi : oneri.Gerekce;
-            oda.KullanilanModel = string.IsNullOrWhiteSpace(oneri.KullanilanModel) ? oda.KullanilanModel : oneri.KullanilanModel;
+            await esZamanlilikSiniri.WaitAsync();
+            try
+            {
+                // Sonuç satırı hangi ölçüm türünden geldiğine göre (alan / adet / uzunluk) farklı bir
+                // bağlam metni kurulur — AI'ya her zaman AlanM2 varmış gibi yanlış bağlam verilmesin.
+                var olcumSatiri = oda.Adet.HasValue
+                    ? $"Adet: {oda.Adet} (blok/sembol referansı sayımıyla deterministik hesaplandı)"
+                    : oda.Uzunluk.HasValue
+                        ? $"Uzunluk: {oda.Uzunluk} m (çizgi/hat segmentleri toplamıyla deterministik hesaplandı)"
+                        : $"Alan: {oda.AlanM2} m2\nGeometri: kapalı poligon (shoelace ile deterministik hesaplandı)";
+
+                var baglam = $"Kaynak: DWG çizimi ({dosyaAdi})\nOda/eleman adı: {oda.OdaAdi}\nKat: {(string.IsNullOrWhiteSpace(oda.KatAdi) ? "belirtilmemiş" : oda.KatAdi)}\n{olcumSatiri}";
+                var oneri = await _ai.MetinKumesindenOdaCikarAsync(baglam, _veri.Pozlar, oda.Disiplin);
+                oda.OnerilenPozId = oneri.OnerilenPozId;
+                oda.OneriGerekcesi = string.IsNullOrWhiteSpace(oneri.Gerekce) ? oda.OneriGerekcesi : oneri.Gerekce;
+                oda.KullanilanModel = string.IsNullOrWhiteSpace(oneri.KullanilanModel) ? oda.KullanilanModel : oneri.KullanilanModel;
+            }
+            finally
+            {
+                esZamanlilikSiniri.Release();
+                ilerlemeRaporu?.Report((Interlocked.Increment(ref tamamlanan), odalar.Count));
+            }
         }
+
+        await Task.WhenAll(odalar.Select(TekSatirIsle));
     }
 
-    private static string MTextTemizle(string mtext) =>
-        Regex.Replace(mtext, @"\\[A-Za-z](\d+(\.\d+)?)?;?|[{}]", "").Replace("\\P", "\n").Trim();
+    /// <summary>
+    /// MTEXT formatlama kodlarını temizler. Eski regex (\\[A-Za-z](\d+(\.\d+)?)?;?) sadece sayısal
+    /// parametreli kodları (\H1.5;, \A1;) temizliyordu — \fFontAdı|b0|i0|c0|p34; gibi metin
+    /// parametreli kodlarda (yazı tipi/font değişimi) sadece "\f" kısmını tüketip font adının
+    /// kendisini ("Arial", "Calibri" vb.) ham metin olarak bırakıyordu; bu da oda adlarının
+    /// içine yazı tipi adlarının sızmasına yol açıyordu. Ayrıca \P (paragraf/satır sonu) da bu
+    /// regex tarafından yutulduğu için ondan sonraki .Replace("\\P","\n") hiçbir zaman eşleşmiyor,
+    /// satırlar birbirine yapışıyordu. Bu sürüm: (1) \P ve \~ önce (regex'ten önce) çeviriliyor,
+    /// (2) parametreli kodlar noktalı virgüle kadar (metin/sayı fark etmeksizin) tek seferde
+    /// temizleniyor, (3) parametresiz aç/kapa kodları (\L, \l, \O, \o, \K, \k vb.) da temizleniyor.
+    /// </summary>
+    private static string MTextTemizle(string mtext)
+    {
+        var temiz = mtext.Replace("\\P", "\n").Replace("\\~", " ");
+        temiz = Regex.Replace(temiz, @"\\[A-Za-z](?:[^;\\{}]*;)?", "");
+        temiz = Regex.Replace(temiz, @"[{}]", "");
+        return temiz.Trim();
+    }
 
     private static double Mesafe((double X, double Y) a, (double X, double Y) b) =>
         Math.Sqrt(Math.Pow(b.X - a.X, 2) + Math.Pow(b.Y - a.Y, 2));
+
+    /// <summary>Açık (kapalı olmayan) bir polyline'ın ardışık köşe noktaları arasındaki mesafelerin toplamı — başa dönüş dahil değil.</summary>
+    private static double AcikPolilenkUzunluk(List<(double X, double Y)> noktalar)
+    {
+        double toplam = 0;
+        for (int i = 0; i < noktalar.Count - 1; i++)
+            toplam += Mesafe(noktalar[i], noktalar[i + 1]);
+        return toplam;
+    }
 
     private static (double X, double Y) AgirlikMerkezi(List<(double X, double Y)> noktalar) =>
         (noktalar.Average(n => n.X), noktalar.Average(n => n.Y));

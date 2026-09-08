@@ -262,12 +262,15 @@ public class VeriDeposu
     public async Task OdaAnalizSonucunuOnayla(Proje proje, CizimAnalizSonucu sonuc, Poz poz)
     {
         var katBilgisi = string.IsNullOrWhiteSpace(sonuc.KatAdi) ? "" : $", kat: {sonuc.KatAdi}";
+        // Satır alan (AlanM2) değil adet (blok sayımı) veya uzunluk (kablo/hat) taşıyorsa, metraj
+        // miktarı olarak onlar kullanılır — AlanM2 bu satırlarda 0 kalır ve anlamsızdır.
+        var miktar = sonuc.Adet.HasValue ? (decimal)sonuc.Adet.Value : sonuc.Uzunluk ?? sonuc.AlanM2;
         var kayit = new MetrajKalemiKaydi
         {
             ProjeKaydiId = proje.Id,
             PozId = poz.Id,
             OlcumDetayi = $"AI çizim analiziyle eklendi — oda: {sonuc.OdaAdi}{katBilgisi} ({sonuc.KaynakTuru})",
-            Miktar = sonuc.AlanM2
+            Miktar = miktar
         };
         _db.MetrajKalemleri.Add(kayit);
         await _db.SaveChangesAsync();

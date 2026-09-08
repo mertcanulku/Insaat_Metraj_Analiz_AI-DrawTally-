@@ -18,8 +18,11 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
     <PackageReference Include="PdfPig" Version="0.1.9" />
-    <!-- DWG/DXF çizim dosyalarını okumak için: ücretsiz, açık kaynak (MIT lisanslı), alpha aşamasında -->
-    <PackageReference Include="ACadSharp" Version="1.4.0-alpha" />
+    <!-- DWG/DXF çizim dosyalarını okumak için: ücretsiz, açık kaynak (MIT lisanslı). 1.4.0-alpha'da
+         bazı Insert (blok referansı) içeren gerçek dünya DWG dosyaları CadInsertTemplate.Build
+         içinde NullReferenceException ile parse aşamasında çöküyordu (ACadSharp'ın kendi iç hatası,
+         bizim kodumuzdan önce oluşuyordu) — kütüphane o zamandan beri 3.x kararlı sürüme ulaştı. -->
+    <PackageReference Include="ACadSharp" Version="3.7.1" />
     <PackageReference Include="PDFtoImage" Version="5.4.0" />
   </ItemGroup>
 

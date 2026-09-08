@@ -6,6 +6,7 @@
 @inject CizimAnalizServisi CizimAnalizServisi
 @inject IJSRuntime JS
 @inject AuthenticationStateProvider AuthProvider
+@inject ILogger<ProjeImport> Logger
 
 @if (proje == null)
 {
@@ -128,8 +129,13 @@ else
             {
                 <span class="disiplin-etiket">@DisiplinTespitServisi.GosterimAdi(disiplin)</span>
             }
+            <button @onclick="SonuclariTemizle" title="Aşağıdaki tüm önerileri listeden kaldırır — henüz onaylanmamış satırlar için geri alınamaz, onaylanmış satırlar zaten metraj tablosunda kalır.">Sonuçları Temizle</button>
         </h3>
-        <p>Aşağıdaki satırlar sadece öneridir; hiçbiri onaylanmadan projenin metraj tablosuna eklenmez.</p>
+        <p>
+            Aşağıdaki satırlar sadece öneridir; hiçbiri onaylanmadan projenin metraj tablosuna eklenmez.
+            Aynı projeye art arda birden fazla dosya yüklersen sonuçlar üzerine yazılmaz, birikir —
+            hangi satırın hangi dosyadan geldiği "Dosya" sütununda görünür.
+        </p>
 
         <h4>
             Kesin Eşleşmeler (@kesinSonuclar.Count)
@@ -164,8 +170,9 @@ else
         <thead>
             <tr>
                 <th>Oda Adı</th>
-                <th>Alan (m²)</th>
+                <th>Miktar</th>
                 <th>Kat</th>
+                <th>Dosya</th>
                 <th>Kaynak</th>
                 <th>Güven</th>
                 <th>Önerilen Poz</th>
@@ -190,16 +197,39 @@ else
                         }
                     </td>
                     <td>
-                        @if (s.OnaylandiMi)
+                        @if (s.Adet.HasValue)
                         {
-                            @s.AlanM2.ToString("0.00")
+                            @if (s.OnaylandiMi)
+                            {
+                                @($"{s.Adet} adet")
+                            }
+                            else
+                            {
+                                <input type="number" @bind="s.Adet" style="width:5rem" /> <text>adet</text>
+                            }
+                        }
+                        else if (s.Uzunluk.HasValue)
+                        {
+                            @if (s.OnaylandiMi)
+                            {
+                                @($"{s.Uzunluk?.ToString("0.00")} m")
+                            }
+                            else
+                            {
+                                <input type="number" step="0.01" @bind="s.Uzunluk" style="width:6rem" /> <text>m</text>
+                            }
+                        }
+                        else if (s.OnaylandiMi)
+                        {
+                            @($"{s.AlanM2.ToString("0.00")} m²")
                         }
                         else
                         {
-                            <input type="number" step="0.01" @bind="s.AlanM2" style="width:6rem" />
+                            <input type="number" step="0.01" @bind="s.AlanM2" style="width:6rem" /> <text>m²</text>
                         }
                     </td>
                     <td>@(string.IsNullOrWhiteSpace(s.KatAdi) ? "—" : s.KatAdi)</td>
+                    <td style="font-size:0.85rem">@(string.IsNullOrWhiteSpace(s.KaynakDosya) ? "—" : s.KaynakDosya)</td>
                     <td>@KaynakEtiketi(s.KaynakTuru)</td>
                     <td>@s.GuvenSkoru</td>
                     <td>
@@ -271,7 +301,9 @@ else
         isleniyor = true;
         genelHataMesaji = "";
         importSonuclari = new();
-        odaSonuclari = new();
+        // odaSonuclari kasıtlı olarak SIFIRLANMIYOR — aynı projeye art arda birden fazla çizim/PDF
+        // yüklendiğinde önceki dosyanın sonuçları silinmeden birikir; her satır KaynakDosya alanıyla
+        // hangi dosyadan geldiğini taşır (bkz. tablo "Dosya" sütunu).
         StateHasChanged();
 
         var dosyaAdi = e.File.Name.ToLowerInvariant();
@@ -300,7 +332,7 @@ else
                 bellekAkisi.Position = 0;
                 isleniyorMesaji = "Yapay zeka çizimdeki oda/alanları değerlendiriyor...";
                 StateHasChanged();
-                odaSonuclari = await CizimAnalizServisi.PdfAnalizEt(bellekAkisi, e.File.Name);
+                odaSonuclari.AddRange(await CizimAnalizServisi.PdfAnalizEt(bellekAkisi, e.File.Name));
             }
             else
             {
@@ -314,6 +346,10 @@ else
         }
         catch (Exception ex)
         {
+            // ex.Message tek başına teşhis için yetersiz (ör. "Object reference not set to an
+            // instance of an object." stack trace olmadan nereden geldiğini söylemez) — tam
+            // exception sunucu konsoluna/log'a yazılır, kullanıcıya kısa mesaj gösterilir.
+            Logger.LogError(ex, "Dosya işlenirken hata oluştu: {DosyaAdi}", e.File.Name);
             genelHataMesaji = $"Dosya işlenirken hata oluştu: {ex.Message}";
         }
 
@@ -331,17 +367,27 @@ else
         await stream.CopyToAsync(bellekAkisi);
         bellekAkisi.Position = 0;
 
-        odaSonuclari = CizimAnalizServisi.DwgAnalizEt(bellekAkisi, e.File.Name);
+        var yeniSonuclar = CizimAnalizServisi.DwgAnalizEt(bellekAkisi, e.File.Name);
 
-        if (odaSonuclari.Count == 0)
+        if (yeniSonuclar.Count == 0)
         {
-            genelHataMesaji = "Çizimde kapalı poligon (oda/alan sınırı) bulunamadı.";
+            genelHataMesaji = "Çizimde kapalı poligon (oda/alan sınırı), blok referansı (kolon/priz vb.) veya elektrik hattı bulunamadı.";
             return;
         }
 
-        isleniyorMesaji = "Yapay zeka her oda için poz önerisi hazırlıyor...";
+        isleniyorMesaji = $"Yapay zeka poz önerisi hazırlıyor... (0 / {yeniSonuclar.Count})";
         StateHasChanged();
-        await CizimAnalizServisi.DwgPozOnerileriniEkleAsync(odaSonuclari, e.File.Name);
+        // Sadece bu yüklemeden gelen yeni satırlar için poz önerisi istenir — önceki yüklemelerden
+        // gelen ve zaten onaylanmış/işlenmiş satırlar tekrar AI'ya gönderilmez. İlerleme raporu
+        // olmadan bu adım (onlarca satırda 5-15+ dakika sürebiliyor) sabit bir mesajla "takılı
+        // kalmış" gibi görünüyordu — her satır bittiğinde mesaj güncellenir.
+        var ilerleme = new Progress<(int Tamamlanan, int Toplam)>(p =>
+        {
+            isleniyorMesaji = $"Yapay zeka poz önerisi hazırlıyor... ({p.Tamamlanan} / {p.Toplam})";
+            StateHasChanged();
+        });
+        await CizimAnalizServisi.DwgPozOnerileriniEkleAsync(yeniSonuclar, e.File.Name, ilerleme);
+        odaSonuclari.AddRange(yeniSonuclar);
     }
 
     private async Task OdaOnerisiOnayla(int index)
@@ -377,6 +423,15 @@ else
         }
     }
 
+    /// <summary>Öneri listesini temizler — sonuçlar artık dosya yüklemeleri arasında birikiyor
+    /// olduğundan, kullanıcının listeyi elle sıfırlayabileceği bir yol gerekiyor. Zaten onaylanmış
+    /// (metraj tablosuna eklenmiş) satırlar buradan silinmiyor — sadece görünen öneri listesinden
+    /// atılıyor; onları silmek için üstündeki "Sil" butonu kullanılır.</summary>
+    private void SonuclariTemizle()
+    {
+        odaSonuclari.RemoveAll(s => !s.OnaylandiMi);
+    }
+
     private async Task ImportSatiriSil(ImportSonucSatiri s)
     {
         if (proje == null || s.EklenenMetrajKalemiId is not { } id) return;
@@ -400,6 +455,7 @@ else
         KaynakTuru.VektorMetin => "Vektör metin",
         KaynakTuru.VektorGeometri => "Vektör geometri",
         KaynakTuru.AIGorsel => "AI görsel",
+        KaynakTuru.BlokSayimi => "Blok sayımı",
         _ => kaynak.ToString()
     };
 }
