@@ -20,8 +20,17 @@ builder.Services.AddRazorComponents()
 // ApplicationDbContext scoped olduğu için VeriDeposu de scoped olmalı.
 builder.Services.AddScoped<VeriDeposu>();
 
-// PDF/DWG çizim analizi (oda adı + alan çıkarımı) için Claude API'sine bağlanan servis.
-builder.Services.AddHttpClient<AiSiniflandirmaServisi>();
+// PDF/DWG çizim analizi (oda adı + alan çıkarımı): appsettings.json'daki "AiProvider"
+// ("Anthropic" | "Nvidia") ayarına göre hangi AI sağlayıcısının kullanılacağını seçer.
+if (builder.Configuration["AiProvider"] == "Nvidia")
+{
+    builder.Services.AddHttpClient<IAiClassificationProvider, NvidiaNimProvider>();
+}
+else
+{
+    builder.Services.AddHttpClient<IAiClassificationProvider, AnthropicClassificationProvider>();
+}
+builder.Services.AddTransient<AiSiniflandirmaServisi>();
 
 // PDF/DWG çizimlerinden oda/alan çıkaran ortak analiz servisi (AiSiniflandirmaServisi + VeriDeposu üzerine kurulu).
 builder.Services.AddScoped<CizimAnalizServisi>();
