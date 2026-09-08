@@ -10,8 +10,17 @@ builder.Services.AddRazorComponents()
 // İleride bu servis, gerçek bir veritabanı (PostgreSQL/SQL Server) ile değiştirilecek.
 builder.Services.AddSingleton<VeriDeposu>();
 
-// DWG/DXF katman sınıflandırması için Claude API'sine bağlanan servis.
-builder.Services.AddHttpClient<AiSiniflandirmaServisi>();
+// DWG/DXF katman sınıflandırması: appsettings.json'daki "AiProvider" ("Anthropic" | "Nvidia")
+// ayarına göre hangi AI sağlayıcısının kullanılacağını seçer.
+if (builder.Configuration["AiProvider"] == "Nvidia")
+{
+    builder.Services.AddHttpClient<IAiClassificationProvider, NvidiaNimProvider>();
+}
+else
+{
+    builder.Services.AddHttpClient<IAiClassificationProvider, AnthropicClassificationProvider>();
+}
+builder.Services.AddTransient<AiSiniflandirmaServisi>();
 
 var app = builder.Build();
 
