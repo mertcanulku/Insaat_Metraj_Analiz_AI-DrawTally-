@@ -1,0 +1,21 @@
+@page "/account/cikis"
+@layout Layout.LoginLayout
+@using Microsoft.AspNetCore.Identity
+@using InsaatMetrajWeb.Data
+@attribute [Authorize]
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityRedirectManager RedirectManager
+
+<div class="account-card">
+    <h1>Çıkış yapılıyor…</h1>
+    <p>Bir sorun olursa <a href="account/giris">buraya tıklayın</a>.</p>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await SignInManager.SignOutAsync();
+        RedirectManager.RedirectTo("account/giris");
+    }
+}

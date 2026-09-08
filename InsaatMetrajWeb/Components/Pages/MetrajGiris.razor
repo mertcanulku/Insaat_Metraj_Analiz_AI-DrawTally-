@@ -1,5 +1,8 @@
 @page "/proje/{ProjeId:int}/metraj-giris"
+@rendermode InteractiveServer
+@attribute [Authorize]
 @inject VeriDeposu Veri
+@inject AuthenticationStateProvider AuthProvider
 
 @if (proje == null)
 {
@@ -58,12 +61,13 @@ else
     private string sonMesaj = "";
     private bool sonBasarili;
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
-        proje = Veri.ProjeBul(ProjeId);
+        var sahipId = await AuthProvider.GetUserIdAsync();
+        proje = await Veri.ProjeBul(sahipId, ProjeId);
     }
 
-    private void KalemEkle()
+    private async Task KalemEkle()
     {
         if (proje == null) return;
 
@@ -82,14 +86,7 @@ else
             return;
         }
 
-        var yeniId = proje.MetrajKalemleri.Count == 0 ? 1 : proje.MetrajKalemleri.Max(k => k.Id) + 1;
-        proje.MetrajKalemleri.Add(new MetrajKalemi
-        {
-            Id = yeniId,
-            Poz = poz,
-            OlcumDetayi = olcumDetayi,
-            Miktar = miktar
-        });
+        await Veri.MetrajKalemiEkle(proje, poz, olcumDetayi, miktar);
 
         sonMesaj = $"Eklendi: {poz.PozKodu} - {miktar:0.000} {poz.Birim}";
         sonBasarili = true;

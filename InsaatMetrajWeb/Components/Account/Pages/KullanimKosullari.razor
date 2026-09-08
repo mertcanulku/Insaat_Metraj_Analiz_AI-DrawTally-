@@ -1,0 +1,47 @@
+@page "/account/kosullar"
+@layout Layout.LoginLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>Kullanım Koşulları</PageTitle>
+
+<div class="account-card account-card-wide">
+    <h1>Kullanım Koşulları</h1>
+
+    <p><em>Son güncelleme: @DateTime.UtcNow.ToString("dd.MM.yyyy")</em></p>
+
+    <p>
+        DrawTally'i ("Uygulama") kullanarak aşağıdaki koşulları kabul etmiş olursunuz. Bu metin,
+        küçük ölçekli/dahili kullanım için hazırlanmış genel bir taslaktır — kurumsal kullanım
+        için hukuki danışmanlıkla gözden geçirilmesi önerilir.
+    </p>
+
+    <h3>1. Hesap</h3>
+    <p>
+        Hesabınızın güvenliğinden (şifrenizin gizliliği dahil) siz sorumlusunuz. Hesabınızda
+        gerçekleşen işlemlerden, aksi kanıtlanmadıkça, hesap sahibi sorumlu tutulur.
+    </p>
+
+    <h3>2. Veri Kullanımı</h3>
+    <p>
+        Uygulamaya yüklediğiniz projeler, metraj kalemleri ve dosyalar (CSV/PDF/DWG/DXF) yalnızca
+        sizin hesabınızla ilişkilendirilir ve başka kullanıcılarla paylaşılmaz. Veriler bu
+        uygulamanın veritabanında saklanır; düzenli yedekleme sizin sorumluluğunuzdadır.
+    </p>
+
+    <h3>3. Sorumluluk Reddi</h3>
+    <p>
+        Uygulama "olduğu gibi" sunulur. Metraj/keşif hesaplamaları ve yapay zeka destekli çizim
+        önerileri kontrol amaçlıdır; nihai mühendislik/mimari sorumluluk kullanıcıya aittir.
+        Uygulama sahibi, hesaplama hatalarından veya veri kaybından doğabilecek zararlardan
+        sorumlu tutulamaz.
+    </p>
+
+    <h3>4. Değişiklikler</h3>
+    <p>
+        Bu koşullar zaman zaman güncellenebilir. Önemli değişikliklerde kullanıcılar bilgilendirilir.
+    </p>
+
+    <p class="account-footer">
+        <a href="account/kayit">Kayıt sayfasına dön</a>
+    </p>
+</div>

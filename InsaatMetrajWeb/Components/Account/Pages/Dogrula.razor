@@ -1,0 +1,110 @@
+@page "/account/dogrula"
+@layout Layout.LoginLayout
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using InsaatMetrajWeb.Data
+@using InsaatMetrajWeb.Services
+@attribute [AllowAnonymous]
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject EmailDogrulamaServisi DogrulamaServisi
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>E-posta Doğrulama</PageTitle>
+
+<div class="account-card">
+    <h1>E-posta Doğrulama</h1>
+
+    @if (string.IsNullOrEmpty(Email))
+    {
+        <p class="account-error">Doğrulanacak e-posta adresi belirtilmedi. <a href="account/kayit">Kayıt sayfasına dön</a>.</p>
+    }
+    else
+    {
+        <p>
+            <strong>@Email</strong> adresine gönderilen 6 haneli doğrulama kodunu aşağıya girin.
+        </p>
+
+        @if (!string.IsNullOrEmpty(GosterimKodu))
+        {
+            <p class="account-error">
+                SMTP yapılandırılmadığı için kod şu an e-posta yerine burada gösteriliyor (geliştirme modu):
+                <strong>@GosterimKodu</strong>
+            </p>
+        }
+
+        <StatusMessage Message="@mesaj" />
+
+        <EditForm Model="Input" method="post" OnValidSubmit="KoduDogrula" FormName="dogrula">
+            <DataAnnotationsValidator />
+
+            <div class="form-group">
+                <label for="kod">Doğrulama Kodu</label>
+                <InputText @bind-Value="Input.Kod" id="kod" class="form-control" autocomplete="one-time-code" autofocus placeholder="123456" />
+                <ValidationMessage For="() => Input.Kod" class="field-error" />
+            </div>
+
+            <button type="submit" class="btn-primary">Doğrula</button>
+        </EditForm>
+
+        <EditForm Model="this" method="post" OnSubmit="KoduTekrarGonder" FormName="yeniden-gonder">
+            <button type="submit" class="btn-secondary-link">Kodu tekrar gönder</button>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? GosterimKodu { get; set; }
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    private string? mesaj;
+
+    private async Task KoduDogrula()
+    {
+        var kullanici = await UserManager.FindByEmailAsync(Email ?? "");
+        if (kullanici == null)
+        {
+            mesaj = "Kullanıcı bulunamadı.";
+            return;
+        }
+
+        var (basarili, sonucMesaji) = await DogrulamaServisi.KoduDogrula(kullanici, Input.Kod);
+        if (!basarili)
+        {
+            mesaj = sonucMesaji;
+            return;
+        }
+
+        await SignInManager.SignInAsync(kullanici, isPersistent: false);
+        RedirectManager.RedirectTo("/");
+    }
+
+    private async Task KoduTekrarGonder()
+    {
+        var kullanici = await UserManager.FindByEmailAsync(Email ?? "");
+        if (kullanici == null) return;
+
+        var yeniGosterimKodu = await DogrulamaServisi.KodGonder(kullanici);
+
+        var yol = $"account/dogrula?email={Uri.EscapeDataString(Email ?? "")}";
+        if (!string.IsNullOrEmpty(yeniGosterimKodu))
+        {
+            yol += $"&gosterimKodu={yeniGosterimKodu}";
+        }
+        RedirectManager.RedirectTo(yol);
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Kod gerekli.")]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "Kod 6 haneli olmalı.")]
+        public string Kod { get; set; } = "";
+    }
+}

@@ -1,0 +1,113 @@
+@page "/account/kayit"
+@layout Layout.LoginLayout
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using InsaatMetrajWeb.Data
+@using InsaatMetrajWeb.Services
+@attribute [AllowAnonymous]
+
+@inject UserManager<ApplicationUser> UserManager
+@inject EmailDogrulamaServisi DogrulamaServisi
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<Register> Logger
+
+<PageTitle>Kayıt Ol</PageTitle>
+
+<div class="account-card">
+    <h1>Hesap Oluştur</h1>
+
+    <StatusMessage Message="@errorMessage" />
+
+    <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="account-error" role="alert" />
+
+        <div class="form-group">
+            <label for="email">E-posta</label>
+            <InputText @bind-Value="Input.Email" id="email" class="form-control" autocomplete="username" autofocus placeholder="ad@ornek.com" />
+            <ValidationMessage For="() => Input.Email" class="field-error" />
+        </div>
+
+        <div class="form-group">
+            <label for="password">Şifre</label>
+            <InputText type="password" @bind-Value="Input.Password" id="password" class="form-control" autocomplete="new-password" placeholder="en az 6 karakter" />
+            <ValidationMessage For="() => Input.Password" class="field-error" />
+        </div>
+
+        <div class="form-group">
+            <label for="confirmPassword">Şifre (tekrar)</label>
+            <InputText type="password" @bind-Value="Input.ConfirmPassword" id="confirmPassword" class="form-control" autocomplete="new-password" placeholder="şifreyi tekrar yazın" />
+            <ValidationMessage For="() => Input.ConfirmPassword" class="field-error" />
+        </div>
+
+        <div class="form-check">
+            <label>
+                <InputCheckbox @bind-Value="Input.SozlesmeyiKabulEt" />
+                <a href="account/kosullar" target="_blank">Kullanım Koşulları</a>'nı okudum ve kabul ediyorum
+            </label>
+            <ValidationMessage For="() => Input.SozlesmeyiKabulEt" class="field-error" />
+        </div>
+
+        <button type="submit" class="btn-primary">Kayıt Ol</button>
+    </EditForm>
+
+    <p class="account-footer">
+        Zaten hesabın var mı? <a href="account/giris">Giriş yap</a>
+    </p>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    private async Task RegisterUser()
+    {
+        var user = new ApplicationUser
+        {
+            UserName = Input.Email,
+            Email = Input.Email,
+            EmailConfirmed = false,
+            SozlesmeKabulTarihi = DateTime.UtcNow,
+        };
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (!result.Succeeded)
+        {
+            errorMessage = string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+
+        Logger.LogInformation("Yeni kullanıcı oluşturuldu, doğrulama bekleniyor: {Email}", Input.Email);
+
+        var gosterimKodu = await DogrulamaServisi.KodGonder(user);
+
+        var yol = $"account/dogrula?email={Uri.EscapeDataString(Input.Email)}";
+        if (!string.IsNullOrEmpty(gosterimKodu))
+        {
+            yol += $"&gosterimKodu={gosterimKodu}";
+        }
+
+        RedirectManager.RedirectTo(yol);
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "E-posta gerekli.")]
+        [EmailAddress(ErrorMessage = "Geçerli bir e-posta girin.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Şifre gerekli.")]
+        [StringLength(100, ErrorMessage = "{0} en az {2} karakter olmalı.", MinimumLength = 6)]
+        public string Password { get; set; } = "";
+
+        [Required(ErrorMessage = "Şifre tekrarı gerekli.")]
+        [Compare(nameof(Password), ErrorMessage = "Şifreler eşleşmiyor.")]
+        public string ConfirmPassword { get; set; } = "";
+
+        [Range(typeof(bool), "true", "true", ErrorMessage = "Devam etmek için Kullanım Koşulları'nı kabul etmelisiniz.")]
+        public bool SozlesmeyiKabulEt { get; set; }
+    }
+}

@@ -1,6 +1,9 @@
 @page "/"
+@rendermode InteractiveServer
+@attribute [Authorize]
 @inject VeriDeposu Veri
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthProvider
 
 <h1>Projeler</h1>
 <p>Devam etmek istediğin projeyi seç, ya da yeni bir proje oluştur.</p>
@@ -15,7 +18,7 @@
         </tr>
     </thead>
     <tbody>
-        @foreach (var p in Veri.Projeler)
+        @foreach (var p in projeler)
         {
             <tr>
                 <td>@p.Ad</td>
@@ -36,11 +39,19 @@
 
 @code {
     private string yeniProjeAdi = "";
+    private List<Proje> projeler = new();
+    private string sahipId = "";
 
-    private void YeniProjeOlustur()
+    protected override async Task OnInitializedAsync()
+    {
+        sahipId = await AuthProvider.GetUserIdAsync();
+        projeler = await Veri.ProjeleriListele(sahipId);
+    }
+
+    private async Task YeniProjeOlustur()
     {
         if (string.IsNullOrWhiteSpace(yeniProjeAdi)) return;
-        var yeniProje = Veri.ProjeEkle(yeniProjeAdi.Trim());
+        var yeniProje = await Veri.ProjeEkle(sahipId, yeniProjeAdi.Trim());
         Nav.NavigateTo($"proje/{yeniProje.Id}");
     }
 }

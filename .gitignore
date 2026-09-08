@@ -5,6 +5,11 @@ obj/
 *.suo
 .vs/
 
+## Yerel veritabanı (kullanıcı hesapları)
+*.db
+*.db-shm
+*.db-wal
+
 ## OS
 .DS_Store
 Thumbs.db

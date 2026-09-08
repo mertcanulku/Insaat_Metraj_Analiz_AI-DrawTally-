@@ -1,0 +1,110 @@
+@page "/account/giris"
+@layout Layout.LoginLayout
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using InsaatMetrajWeb.Data
+@using InsaatMetrajWeb.Services
+@attribute [AllowAnonymous]
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject EmailDogrulamaServisi DogrulamaServisi
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<Login> Logger
+
+<PageTitle>Giriş Yap</PageTitle>
+
+<div class="account-card">
+    <h1>Giriş Yap</h1>
+
+    <StatusMessage Message="@errorMessage" />
+
+    <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="account-error" role="alert" />
+
+        <div class="form-group">
+            <label for="email">E-posta</label>
+            <InputText @bind-Value="Input.Email" id="email" class="form-control" autocomplete="username" autofocus placeholder="ad@ornek.com" />
+            <ValidationMessage For="() => Input.Email" class="field-error" />
+        </div>
+
+        <div class="form-group">
+            <label for="password">Şifre</label>
+            <InputText type="password" @bind-Value="Input.Password" id="password" class="form-control" autocomplete="current-password" placeholder="şifre" />
+            <ValidationMessage For="() => Input.Password" class="field-error" />
+        </div>
+
+        <div class="form-check">
+            <label>
+                <InputCheckbox @bind-Value="Input.RememberMe" />
+                Beni hatırla
+            </label>
+        </div>
+
+        <button type="submit" class="btn-primary">Giriş Yap</button>
+    </EditForm>
+
+    <p class="account-footer">
+        Hesabın yok mu? <a href="account/kayit">Kayıt ol</a>
+    </p>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private async Task LoginUser()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: true);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("Kullanıcı giriş yaptı: {Email}", Input.Email);
+            RedirectManager.RedirectTo(ReturnUrl ?? "/");
+        }
+        else if (result.IsLockedOut)
+        {
+            errorMessage = "Bu hesap çok fazla başarısız denemeden dolayı kilitlendi. Lütfen daha sonra tekrar deneyin.";
+        }
+        else if (result.IsNotAllowed)
+        {
+            var kullanici = await UserManager.FindByEmailAsync(Input.Email);
+            var gosterimKodu = kullanici != null ? await DogrulamaServisi.KodGonder(kullanici) : "";
+
+            var yol = $"account/dogrula?email={Uri.EscapeDataString(Input.Email)}";
+            if (!string.IsNullOrEmpty(gosterimKodu))
+            {
+                yol += $"&gosterimKodu={gosterimKodu}";
+            }
+            RedirectManager.RedirectTo(yol);
+        }
+        else
+        {
+            errorMessage = "Geçersiz e-posta veya şifre.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "E-posta gerekli.")]
+        [EmailAddress(ErrorMessage = "Geçerli bir e-posta girin.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Şifre gerekli.")]
+        public string Password { get; set; } = "";
+
+        public bool RememberMe { get; set; }
+    }
+}
