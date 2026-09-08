@@ -15,6 +15,7 @@ public class MetrajKalemi
     public required Poz Poz { get; set; }
     public string OlcumDetayi { get; set; } = "";
     public decimal Miktar { get; set; }
+    public ProjeDisiplini Disiplin { get; set; }
 
     public decimal ToplamMaliyet() => Miktar * Poz.BirimMaliyet();
 }

@@ -25,9 +25,22 @@ else
     }
     else
     {
+        <div class="disiplin-tablar">
+            <button type="button" class="disiplin-tab @(secilenDisiplin == null ? "aktif" : "")" @onclick="() => secilenDisiplin = null">
+                Tümü (@proje.MetrajKalemleri.Count)
+            </button>
+            @foreach (var grup in proje.MetrajKalemleri.GroupBy(k => k.Disiplin).OrderBy(g => g.Key == ProjeDisiplini.Bilinmiyor ? int.MaxValue : (int)g.Key))
+            {
+                <button type="button" class="disiplin-tab @(secilenDisiplin == grup.Key ? "aktif" : "")" @onclick="() => secilenDisiplin = grup.Key">
+                    @DisiplinTespitServisi.GosterimAdi(grup.Key) (@grup.Count())
+                </button>
+            }
+        </div>
+
         <table class="veri-tablo">
             <thead>
                 <tr>
+                    <th>Disiplin</th>
                     <th>Poz Kodu</th>
                     <th>Poz Adı</th>
                     <th>Ölçüm Detayı</th>
@@ -38,9 +51,10 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var k in proje.MetrajKalemleri)
+                @foreach (var k in GosterilenKalemler())
                 {
                     <tr>
+                        <td>@DisiplinTespitServisi.GosterimAdi(k.Disiplin)</td>
                         <td>@k.Poz.PozKodu</td>
                         <td>@k.Poz.Ad</td>
                         <td>@k.OlcumDetayi</td>
@@ -52,8 +66,16 @@ else
                 }
             </tbody>
             <tfoot>
+                @if (secilenDisiplin != null)
+                {
+                    <tr>
+                        <td colspan="6" style="text-align:right"><strong>@DisiplinTespitServisi.GosterimAdi(secilenDisiplin.Value) ARA TOPLAM</strong></td>
+                        <td><strong>@GosterilenKalemler().Sum(k => k.ToplamMaliyet()).ToString("N2") TL</strong></td>
+                        <td></td>
+                    </tr>
+                }
                 <tr>
-                    <td colspan="5" style="text-align:right"><strong>GENEL TOPLAM</strong></td>
+                    <td colspan="6" style="text-align:right"><strong>GENEL TOPLAM (tüm disiplinler)</strong></td>
                     <td><strong>@proje.ToplamMaliyet().ToString("N2") TL</strong></td>
                     <td></td>
                 </tr>
@@ -67,12 +89,18 @@ else
     public int ProjeId { get; set; }
 
     private Proje? proje;
+    private ProjeDisiplini? secilenDisiplin;
 
     protected override async Task OnParametersSetAsync()
     {
         var sahipId = await AuthProvider.GetUserIdAsync();
         proje = await Veri.ProjeBul(sahipId, ProjeId);
     }
+
+    private List<MetrajKalemi> GosterilenKalemler() =>
+        secilenDisiplin == null
+            ? proje!.MetrajKalemleri
+            : proje!.MetrajKalemleri.Where(k => k.Disiplin == secilenDisiplin).ToList();
 
     private async Task KalemSil(int metrajKalemiId)
     {

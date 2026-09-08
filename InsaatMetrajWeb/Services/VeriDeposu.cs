@@ -64,7 +64,7 @@ public class VeriDeposu
         Ad = kayit.Ad,
         MetrajKalemleri = kayit.MetrajKalemleri
             .Select(k => PozIdIleBul(k.PozId) is { } poz
-                ? new MetrajKalemi { Id = k.Id, Poz = poz, OlcumDetayi = k.OlcumDetayi, Miktar = k.Miktar }
+                ? new MetrajKalemi { Id = k.Id, Poz = poz, OlcumDetayi = k.OlcumDetayi, Miktar = k.Miktar, Disiplin = k.Disiplin }
                 : null)
             .Where(k => k != null)
             .Select(k => k!)
@@ -82,7 +82,7 @@ public class VeriDeposu
     /// Her satır için sonuç (başarılı/başarısız + sebep) döner, böylece kullanıcı
     /// hangi satırların eşleşmediğini görüp elle düzeltebilir.
     /// </summary>
-    public async Task<List<ImportSonucSatiri>> ProjeyeCsvImportEt(Proje proje, string csvIcerik)
+    public async Task<List<ImportSonucSatiri>> ProjeyeCsvImportEt(Proje proje, string csvIcerik, ProjeDisiplini disiplin = ProjeDisiplini.Bilinmiyor)
     {
         var sonuclar = new List<ImportSonucSatiri>();
         var eklenenKayitlar = new List<(ImportSonucSatiri Sonuc, MetrajKalemiKaydi Kayit)>();
@@ -137,7 +137,8 @@ public class VeriDeposu
                 ProjeKaydiId = proje.Id,
                 PozId = eslesenPoz.Id,
                 OlcumDetayi = olcumDetayi,
-                Miktar = miktar
+                Miktar = miktar,
+                Disiplin = disiplin
             };
             _db.MetrajKalemleri.Add(kayit);
 
@@ -165,7 +166,7 @@ public class VeriDeposu
     /// NOT: Taranmış (resim) PDF'lerde metin katmanı olmadığı için bu yöntem çalışmaz —
     /// o durum için ayrıca OCR (örn. Tesseract) entegrasyonu gerekir, bu demo'ya dahil değil.
     /// </summary>
-    public async Task<List<ImportSonucSatiri>> ProjeyePdfImportEt(Proje proje, Stream pdfStream)
+    public async Task<List<ImportSonucSatiri>> ProjeyePdfImportEt(Proje proje, Stream pdfStream, ProjeDisiplini disiplin = ProjeDisiplini.Bilinmiyor)
     {
         var sonuclar = new List<ImportSonucSatiri>();
         var eklenenKayitlar = new List<(ImportSonucSatiri Sonuc, MetrajKalemiKaydi Kayit)>();
@@ -239,7 +240,8 @@ public class VeriDeposu
                     ProjeKaydiId = proje.Id,
                     PozId = eslesenPoz.Id,
                     OlcumDetayi = olcumDetayi,
-                    Miktar = miktar
+                    Miktar = miktar,
+                    Disiplin = disiplin
                 };
                 _db.MetrajKalemleri.Add(kayit);
 
@@ -270,7 +272,8 @@ public class VeriDeposu
             ProjeKaydiId = proje.Id,
             PozId = poz.Id,
             OlcumDetayi = $"AI çizim analiziyle eklendi — oda: {sonuc.OdaAdi}{katBilgisi} ({sonuc.KaynakTuru})",
-            Miktar = miktar
+            Miktar = miktar,
+            Disiplin = sonuc.Disiplin
         };
         _db.MetrajKalemleri.Add(kayit);
         await _db.SaveChangesAsync();
@@ -282,7 +285,7 @@ public class VeriDeposu
     /// CSV/PDF import satırı ilk seferde hiçbir poz/kısaltmaya eşleşmediğinde (PozEksik=true),
     /// kullanıcı listeden elle bir poz seçtiğinde bu metotla tamamlanır.
     /// </summary>
-    public async Task ImportSatiriniManuelPozIleTamamla(Proje proje, ImportSonucSatiri sonuc, Poz poz)
+    public async Task ImportSatiriniManuelPozIleTamamla(Proje proje, ImportSonucSatiri sonuc, Poz poz, ProjeDisiplini disiplin = ProjeDisiplini.Bilinmiyor)
     {
         if (sonuc.MiktarTaslak is not { } miktar) return;
 
@@ -291,7 +294,8 @@ public class VeriDeposu
             ProjeKaydiId = proje.Id,
             PozId = poz.Id,
             OlcumDetayi = sonuc.OlcumDetayiTaslak,
-            Miktar = miktar
+            Miktar = miktar,
+            Disiplin = disiplin
         };
         _db.MetrajKalemleri.Add(kayit);
         await _db.SaveChangesAsync();

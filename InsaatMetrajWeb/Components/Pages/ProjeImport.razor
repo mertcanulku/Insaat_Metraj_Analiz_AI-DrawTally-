@@ -38,6 +38,20 @@ else
         eşleşmeyen satırlar aşağıda ayrıca listelenir, hiçbiri sessizce atlanmaz.
     </p>
 
+    <div class="disiplin-secici">
+        <label for="csv-disiplin-secici">CSV/PDF keşif satırlarının disiplini (isteğe bağlı):</label>
+        <select id="csv-disiplin-secici" @bind="csvDisiplin">
+            @foreach (var d in Enum.GetValues<ProjeDisiplini>())
+            {
+                <option value="@d">@DisiplinTespitServisi.GosterimAdi(d)</option>
+            }
+        </select>
+        <span class="disiplin-secici-not">
+            CSV'nin ve keşif PDF'inin (metraj satırları) çiziminden otomatik disiplin tespiti yapılamadığından,
+            bu seçim o dosyadan eklenen satırlara uygulanır. DWG/PDF çizim analizinde disiplin otomatik tespit edilir.
+        </span>
+    </div>
+
     <div class="dropzone" id="proje-import-dropzone">
         <div class="dropzone-content">
             <div class="dropzone-icon">⇩</div>
@@ -118,49 +132,52 @@ else
 
     @if (odaSonuclari.Count > 0)
     {
-        var kesinSonuclar = odaSonuclari.Where(s => s.GuvenSkoru != GuvenSkoru.Dusuk).ToList();
-        var belirsizSonuclar = odaSonuclari.Where(s => s.GuvenSkoru == GuvenSkoru.Dusuk).ToList();
-        var kesinOnaysizSayisi = kesinSonuclar.Count(s => !s.OnaylandiMi);
-        var disiplin = odaSonuclari.Select(s => s.Disiplin).FirstOrDefault(d => d != ProjeDisiplini.Bilinmiyor);
-
         <h3>
             Çizim Analizi — Oda/Alan Önerileri (@sonYuklenenFormat)
-            @if (disiplin != ProjeDisiplini.Bilinmiyor)
-            {
-                <span class="disiplin-etiket">@DisiplinTespitServisi.GosterimAdi(disiplin)</span>
-            }
             <button @onclick="SonuclariTemizle" title="Aşağıdaki tüm önerileri listeden kaldırır — henüz onaylanmamış satırlar için geri alınamaz, onaylanmış satırlar zaten metraj tablosunda kalır.">Sonuçları Temizle</button>
         </h3>
         <p>
             Aşağıdaki satırlar sadece öneridir; hiçbiri onaylanmadan projenin metraj tablosuna eklenmez.
-            Aynı projeye art arda birden fazla dosya yüklersen sonuçlar üzerine yazılmaz, birikir —
-            hangi satırın hangi dosyadan geldiği "Dosya" sütununda görünür.
+            Aynı projeye art arda birden fazla dosya (farklı disiplinler dahil) yüklersen sonuçlar üzerine
+            yazılmaz, birikir ve aşağıda disipline göre gruplanır — hangi satırın hangi dosyadan geldiği
+            "Dosya" sütununda görünür.
         </p>
 
-        <h4>
-            Kesin Eşleşmeler (@kesinSonuclar.Count)
-            @if (kesinOnaysizSayisi > 0)
-            {
-                <button @onclick="TumunuOnayla">Tümünü Onayla ve Ekle (@kesinOnaysizSayisi)</button>
-            }
-        </h4>
-        @if (kesinSonuclar.Count == 0)
+        @foreach (var grup in odaSonuclari.GroupBy(s => s.Disiplin).OrderBy(g => g.Key == ProjeDisiplini.Bilinmiyor ? int.MaxValue : (int)g.Key))
         {
-            <p><em>Yüksek/orta güvenle eşleşen satır yok.</em></p>
-        }
-        else
-        {
-            @OdaSonucTablosu(kesinSonuclar)
-        }
+            var kesinSonuclar = grup.Where(s => s.GuvenSkoru != GuvenSkoru.Dusuk).ToList();
+            var belirsizSonuclar = grup.Where(s => s.GuvenSkoru == GuvenSkoru.Dusuk).ToList();
+            var kesinOnaysizSayisi = kesinSonuclar.Count(s => !s.OnaylandiMi);
 
-        @if (belirsizSonuclar.Count > 0)
-        {
-            <h4>Belirsiz Eşleşmeler (@belirsizSonuclar.Count)</h4>
-            <p>
-                Yapay zekanın güveni düşük olduğu için otomatik eklenmez — gerekçesini okuyup elle
-                poz seçerek veya düzelterek onaylayabilirsin.
-            </p>
-            @OdaSonucTablosu(belirsizSonuclar)
+            <details class="disiplin-grup" open>
+                <summary><strong>@DisiplinTespitServisi.GosterimAdi(grup.Key)</strong> (@grup.Count() satır)</summary>
+
+                <h4>
+                    Kesin Eşleşmeler (@kesinSonuclar.Count)
+                    @if (kesinOnaysizSayisi > 0)
+                    {
+                        <button @onclick="() => TumunuOnayla(grup.Key)">Tümünü Onayla ve Ekle (@kesinOnaysizSayisi)</button>
+                    }
+                </h4>
+                @if (kesinSonuclar.Count == 0)
+                {
+                    <p><em>Yüksek/orta güvenle eşleşen satır yok.</em></p>
+                }
+                else
+                {
+                    @OdaSonucTablosu(kesinSonuclar)
+                }
+
+                @if (belirsizSonuclar.Count > 0)
+                {
+                    <h4>Belirsiz Eşleşmeler (@belirsizSonuclar.Count)</h4>
+                    <p>
+                        Yapay zekanın güveni düşük olduğu için otomatik eklenmez — gerekçesini okuyup elle
+                        poz seçerek veya düzelterek onaylayabilirsin.
+                    </p>
+                    @OdaSonucTablosu(belirsizSonuclar)
+                }
+            </details>
         }
     }
 }
@@ -279,6 +296,7 @@ else
     private string sonYuklenenFormat = "";
     private List<ImportSonucSatiri> importSonuclari = new();
     private List<CizimAnalizSonucu> odaSonuclari = new();
+    private ProjeDisiplini csvDisiplin = ProjeDisiplini.Bilinmiyor;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -322,7 +340,7 @@ else
                 using var bellekAkisi = new MemoryStream();
                 await stream.CopyToAsync(bellekAkisi);
                 bellekAkisi.Position = 0;
-                importSonuclari = await Veri.ProjeyePdfImportEt(proje, bellekAkisi);
+                importSonuclari = await Veri.ProjeyePdfImportEt(proje, bellekAkisi, csvDisiplin);
 
                 if (importSonuclari.Count == 0)
                 {
@@ -341,7 +359,7 @@ else
                 using var stream = e.File.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024); // 5MB sınır
                 using var reader = new StreamReader(stream);
                 var icerik = await reader.ReadToEndAsync();
-                importSonuclari = await Veri.ProjeyeCsvImportEt(proje, icerik);
+                importSonuclari = await Veri.ProjeyeCsvImportEt(proje, icerik, csvDisiplin);
             }
         }
         catch (Exception ex)
@@ -402,12 +420,12 @@ else
         await Veri.OdaAnalizSonucunuOnayla(proje, s, poz);
     }
 
-    private async Task TumunuOnayla()
+    private async Task TumunuOnayla(ProjeDisiplini disiplin)
     {
         if (proje == null) return;
         // Belirsiz (Düşük güven) satırlar toplu onaya dahil edilmez — Bölüm 5: kullanıcı bunları
         // ayrı sekmede elle inceleyip onaylamalı.
-        foreach (var s in odaSonuclari.Where(s => !s.OnaylandiMi && s.OnerilenPozId.HasValue && s.GuvenSkoru != GuvenSkoru.Dusuk))
+        foreach (var s in odaSonuclari.Where(s => s.Disiplin == disiplin && !s.OnaylandiMi && s.OnerilenPozId.HasValue && s.GuvenSkoru != GuvenSkoru.Dusuk))
         {
             var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.OnerilenPozId);
             if (poz != null) await Veri.OdaAnalizSonucunuOnayla(proje, s, poz);
@@ -447,7 +465,7 @@ else
         var poz = Veri.Pozlar.FirstOrDefault(p => p.Id == s.SeciliPozId);
         if (poz == null) return;
 
-        await Veri.ImportSatiriniManuelPozIleTamamla(proje, s, poz);
+        await Veri.ImportSatiriniManuelPozIleTamamla(proje, s, poz, csvDisiplin);
     }
 
     private static string KaynakEtiketi(KaynakTuru kaynak) => kaynak switch

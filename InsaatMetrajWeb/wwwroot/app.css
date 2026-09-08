@@ -251,6 +251,46 @@ p.hata-mesaj, p.basarili-mesaj { max-width: none; }
     vertical-align: middle;
 }
 
+.disiplin-secici {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 10px 0;
+    padding: 8px 12px;
+    background: var(--paper);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    max-width: 640px;
+}
+.disiplin-secici label { font-size: 0.85rem; font-weight: 600; }
+.disiplin-secici select { width: fit-content; padding: 4px 8px; font-size: 0.85rem; }
+.disiplin-secici-not { font-size: 0.78rem; color: var(--ink-soft); }
+
+.disiplin-grup {
+    margin: 14px 0;
+    padding: 10px 12px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+}
+.disiplin-grup > summary {
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 4px 0;
+}
+
+.disiplin-tablar { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
+.disiplin-tab {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line-soft);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.disiplin-tab.aktif { background: var(--accent, #184A6E); color: #fff; border-color: transparent; }
+
 ul { color: var(--ink-soft); padding-left: 20px; }
 ul li { margin-bottom: 6px; }
 
