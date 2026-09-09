@@ -72,29 +72,40 @@ public class CizimAnalizServisi
         // Bölüm 4 — proje disiplinini tüm sayfalardaki metinlerden tespit et, AI'ya bağlam olarak ver.
         var disiplin = DisiplinTespitServisi.TespitEt(tumKumeMetinleri);
 
-        foreach (var sayfaVerisi in sayfaVerileri)
+        // Sayfa/küme başına bir AI isteği (bazen ikisi — düşük güvende görsel teyit, veya ucuz model
+        // düşük güvenliyse hibrit yükseltme) sırayla (foreach + await) gönderilirse, çok kümeli bir
+        // PDF'te toplam süre her isteğin süresinin TOPLAMI olur. DWG akışındaki aynı sınırlı-paralellik
+        // desenini (bkz. DwgPozOnerileriniEkleAsync, AiEsZamanliIstekLimiti) burada da kullanıyoruz —
+        // sağlayıcının dakika başı istek limitini aşmamak için eşzamanlılık sınırlı tutulur, aşılırsa
+        // da NvidiaNimProvider zaten 429/5xx'i AiHttpRetryYardimcisi ile otomatik yeniden dener.
+        using var esZamanlilikSiniri = new SemaphoreSlim(AiEsZamanliIstekLimiti);
+
+        async Task<CizimAnalizSonucu?> TaranmisSayfayiIsle(
+            (int SayfaNo, double Genislik, double Yukseklik, List<Word> Kelimeler,
+                List<(string Metin, double Sol, double Alt, double Sag, double Ust)> Kumeler) sayfaVerisi)
         {
-            if (sayfaVerisi.Kelimeler.Count == 0)
+            await esZamanlilikSiniri.WaitAsync();
+            try
             {
                 // Taranmış (resim) sayfa — metin katmanı yok, doğrudan görsele bak.
                 var gorsel = SayfaGorseliOlustur(pdfBaytlari, sayfaVerisi.SayfaNo, sayfaVerisi.Genislik, sayfaVerisi.Yukseklik, kirpma: null);
                 var oda = await _ai.GorseldenOdaCikarAsync(gorsel, _veri.Pozlar, disiplin);
-                if (oda.Ilgili)
-                    sonuclar.Add(SonucaCevir(oda, KaynakTuru.AIGorsel, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi));
-                continue;
+                return oda.Ilgili ? SonucaCevir(oda, KaynakTuru.AIGorsel, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi) : null;
             }
-
-            foreach (var kume in sayfaVerisi.Kumeler)
+            finally
             {
-                // Ön filtre: kot/pafta/diğer gürültü ile ölçü zinciri ve tekrar eden pafta blokları
-                // AI'ya hiç gönderilmez (Bölüm 2).
-                if (CizimGurultuFiltresi.GurultuMu(kume.Metin) ||
-                    CizimGurultuFiltresi.OlcuZinciriBlokMu(kume.Metin) ||
-                    paftaTekrarBloklari.Contains(kume.Metin.Trim()))
-                {
-                    continue;
-                }
+                esZamanlilikSiniri.Release();
+            }
+        }
 
+        async Task<CizimAnalizSonucu?> KumeyiIsle(
+            (int SayfaNo, double Genislik, double Yukseklik, List<Word> Kelimeler,
+                List<(string Metin, double Sol, double Alt, double Sag, double Ust)> Kumeler) sayfaVerisi,
+            (string Metin, double Sol, double Alt, double Sag, double Ust) kume)
+        {
+            await esZamanlilikSiniri.WaitAsync();
+            try
+            {
                 var oda = await _ai.MetinKumesindenOdaCikarAsync(kume.Metin, _veri.Pozlar, disiplin);
                 var kaynak = KaynakTuru.VektorMetin;
 
@@ -116,10 +127,44 @@ public class CizimAnalizServisi
 
                 // AI bu metin kümesinin bir oda/yapı elemanı olmadığına karar verdiyse (genel proje
                 // notu, malzeme şartnamesi, revizyon bilgisi, yön oku vb.) satır hiç eklenmez.
-                if (oda.Ilgili)
-                    sonuclar.Add(SonucaCevir(oda, kaynak, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi));
+                return oda.Ilgili ? SonucaCevir(oda, kaynak, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi) : null;
+            }
+            finally
+            {
+                esZamanlilikSiniri.Release();
             }
         }
+
+        // Önce (AI'ya hiç gitmeyecek) gürültü/pafta-tekrarı satırları ayıklanıp, geri kalan tüm
+        // sayfa/küme işleri TEK bir görev listesine toplanıyor — Task.WhenAll bunların hepsini
+        // (sınırlı eşzamanlılıkla) paralel çalıştırır; sonuç sırası orijinal sayfa/küme sırasıyla
+        // aynı kalır (Task.WhenAll girdi sırasını korur), sadece "ilgisiz" olanlar elenir.
+        var gorevler = new List<Task<CizimAnalizSonucu?>>();
+        foreach (var sayfaVerisi in sayfaVerileri)
+        {
+            if (sayfaVerisi.Kelimeler.Count == 0)
+            {
+                gorevler.Add(TaranmisSayfayiIsle(sayfaVerisi));
+                continue;
+            }
+
+            foreach (var kume in sayfaVerisi.Kumeler)
+            {
+                // Ön filtre: kot/pafta/diğer gürültü ile ölçü zinciri ve tekrar eden pafta blokları
+                // AI'ya hiç gönderilmez (Bölüm 2).
+                if (CizimGurultuFiltresi.GurultuMu(kume.Metin) ||
+                    CizimGurultuFiltresi.OlcuZinciriBlokMu(kume.Metin) ||
+                    paftaTekrarBloklari.Contains(kume.Metin.Trim()))
+                {
+                    continue;
+                }
+
+                gorevler.Add(KumeyiIsle(sayfaVerisi, kume));
+            }
+        }
+
+        var sonucDizisi = await Task.WhenAll(gorevler);
+        sonuclar.AddRange(sonucDizisi.Where(x => x != null).Select(x => x!));
 
         return sonuclar;
     }

@@ -107,14 +107,17 @@ public class AiSiniflandirmaServisi
         try
         {
             var ucuzSonuc = await tekModelCagir(_saglayici.UcuzModel);
+            ucuzSonuc.KullanilanModel = _saglayici.UcuzModel;
 
-            if (ucuzSonuc.Guven >= GuvenEsigi)
-            {
-                ucuzSonuc.KullanilanModel = _saglayici.UcuzModel;
+            // UcuzModel ve GucluModel aynı sağlayıcıda aynı modele işaret ediyorsa (ör. şu an
+            // Nvidia'da güvenilir/hızlı çalışan tek text-only model meta/llama-3.2-11b-vision-instruct
+            // olduğu için ikisi de ona ayarlı — bkz. NvidiaNimProvider), aynı modele aynı girdiyle
+            // ikinci bir istek atmak sadece gecikmeyi ikiye katlar, anlamlı farklı bir cevap gelmez.
+            // Bu durumda yükseltmeyi tamamen atla.
+            if (ucuzSonuc.Guven >= GuvenEsigi || _saglayici.GucluModel == _saglayici.UcuzModel)
                 return ucuzSonuc;
-            }
 
-            // Ucuz modelin güveni düşük -> daha güçlü modele yükselt
+            // Ucuz modelin güveni düşük ve güçlü model gerçekten farklı -> yükselt
             var gucluSonuc = await tekModelCagir(_saglayici.GucluModel);
             gucluSonuc.KullanilanModel = $"{_saglayici.GucluModel} (ucuz model güveni yetersizdi: %{ucuzSonuc.Guven})";
             return gucluSonuc;

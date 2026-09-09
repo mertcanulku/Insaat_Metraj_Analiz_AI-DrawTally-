@@ -22,6 +22,23 @@ public class NvidiaNimProvider : IAiClassificationProvider
 {
     // NIM kataloğundaki model adları — ihtiyaca göre appsettings üzerinden
     // değiştirilebilir hale getirilebilir; şimdilik makul varsayılanlar.
+    //
+    // NOT (2026-09-09, latency optimizasyonu sırasında test edildi): UcuzModel'i daha hafif/hızlı
+    // text-only bir modele ayırmak denendi ama bu hesapta güvenilir çalışan başka bir seçenek
+    // bulunamadı — denenenler:
+    //   - meta/llama-3.1-8b-instruct, meta/llama-3.3-70b-instruct: NVIDIA tarafından emekliye
+    //     ayrılmış (410 Gone).
+    //   - ibm/granite-*, microsoft/phi-3.5-moe-instruct, databricks/dbrx-instruct,
+    //     nv-mistralai/mistral-nemo-12b-instruct, google/gemma-3-*, qwen2.5-7b-instruct: bu hesapta
+    //     entitlement yok (404 "Function not found for account").
+    //   - nvidia/nemotron-3.5-lightning-30b-a3b, openai/gpt-oss-20b: entitlement var (200) ama
+    //     ağır reasoning modelleri — "SADECE JSON döndür" talimatını yok sayıp uzun bir gizli
+    //     "thinking" çıktısı üretiyorlar, max_tokens=2000 + 60s timeout ile bile hiçbir test
+    //     isteğinde geçerli JSON'a ulaşamadılar (ya timeout ya da JSON'suz düşünce metni).
+    // Sonuç: UcuzModel==GucluModel bilinçli bir seçim — AiSiniflandirmaServisi.HibritSiniflandirAsync
+    // bu durumu tespit edip düşük güvende gereksiz ikinci (aynı model, aynı girdi) çağrıyı atlıyor,
+    // asıl gecikme kazancı ise CizimAnalizServisi.PdfAnalizEt'in artık kümeleri sınırlı paralellikle
+    // işlemesinden geliyor (bkz. AiEsZamanliIstekLimiti).
     public string UcuzModel => "meta/llama-3.2-11b-vision-instruct";
     public string GucluModel => "meta/llama-3.2-11b-vision-instruct";
 
