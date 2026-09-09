@@ -72,7 +72,7 @@
         if (result.Succeeded)
         {
             Logger.LogInformation("Kullanıcı giriş yaptı: {Email}", Input.Email);
-            RedirectManager.RedirectTo(ReturnUrl ?? "/");
+            RedirectManager.RedirectTo(ReturnUrl ?? "/projeler");
         }
         else if (result.IsLockedOut)
         {

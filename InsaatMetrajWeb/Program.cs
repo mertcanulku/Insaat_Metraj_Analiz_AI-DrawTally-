@@ -66,13 +66,13 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/account/giris";
 });
 
-builder.Services.AddAuthorization(options =>
-{
-    // Hesap sayfaları [AllowAnonymous] ile işaretlenmedikçe, tüm sayfalar giriş ister.
-    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
-});
+// Not: global bir FallbackPolicy (RequireAuthenticatedUser) kasıtlı olarak KULLANILMIYOR.
+// Her Razor sayfası zaten kendi [Authorize] veya [AllowAnonymous] @attribute'unu taşıyor (bkz. her
+// sayfanın başı) ve bu, AuthorizeRouteView (Routes.razor) üzerinden zaten uygulanıyor. Bir FallbackPolicy
+// eklemek, sayfa bazlı korumaya hiçbir şey katmadan, Blazor Server'ın kendi iç endpoint'lerini
+// (ör. _framework/blazor.web.js) da kimlik doğrulama istemeye zorluyor — bu da anonim erişilebilen
+// interaktif sayfalarda (ör. Landing) SignalR devresinin hiç açılmamasına yol açıyordu.
+builder.Services.AddAuthorization();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("VeritabaniBaglantisi")

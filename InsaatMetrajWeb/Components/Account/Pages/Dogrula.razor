@@ -83,7 +83,7 @@
         }
 
         await SignInManager.SignInAsync(kullanici, isPersistent: false);
-        RedirectManager.RedirectTo("/");
+        RedirectManager.RedirectTo("/projeler");
     }
 
     private async Task KoduTekrarGonder()

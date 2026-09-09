@@ -1,0 +1,309 @@
+@page "/"
+@rendermode InteractiveServer
+@attribute [AllowAnonymous]
+@layout Layout.LandingLayout
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+
+<PageTitle>@T("DrawTally — Çizimden Metraja, Yapay Zeka ile", "DrawTally — From Drawing to Takeoff, with AI")</PageTitle>
+
+@if (!checking)
+{
+    <header class="landing-header">
+        <div class="landing-container landing-header-inner">
+            <a href="/" class="landing-brand">
+                <img src="images/brand/drawtally-icon-only.svg" alt="" class="landing-brand-mark" />
+                <span class="landing-brand-text">
+                    <span class="landing-brand-name">DrawTally</span>
+                    <span class="landing-brand-sub">by Drongos Global</span>
+                </span>
+            </a>
+            <nav class="landing-nav-links">
+                <a href="#nasil-calisir">@T("Nasıl Çalışır", "How It Works")</a>
+                <a href="#guven">@T("Güven", "Trust")</a>
+                <a href="#ozellikler">@T("Özellikler", "Features")</a>
+            </nav>
+            <div class="landing-header-actions">
+                <button class="landing-lang-toggle" @onclick="ToggleLang" title="Türkçe / English">
+                    <span class="@(lang == "tr" ? "aktif" : "")">TR</span>
+                    <span class="landing-lang-sep">/</span>
+                    <span class="@(lang == "en" ? "aktif" : "")">EN</span>
+                </button>
+                <a href="account/giris" class="landing-link-btn">@T("Giriş Yap", "Log in")</a>
+                <a href="account/kayit" class="landing-cta-btn landing-cta-btn-sm">@T("Ücretsiz Başla", "Get Started Free")</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="landing-hero">
+        <div class="landing-container landing-hero-inner">
+            <div class="landing-hero-copy">
+                <span class="landing-eyebrow"><Icon Name="cpu" Size="14" /> @T("Yapay zeka destekli metraj", "AI-assisted quantity takeoff")</span>
+                <h1>@T("Çizimini yükle. Metrajı yapay zeka çıkarsın.", "Upload your drawings. Let AI do the takeoff.")</h1>
+                <p class="landing-hero-sub">
+                    @T("PDF ve DWG çizimlerini yükle; yapay zeka oda ve katmanları analiz edip poz ve maliyet önerir — sen yalnızca onaylarsın. Elle metraj çıkarmaya harcanan saatleri dakikalara indir.",
+                        "Upload PDF and DWG drawings — AI analyzes rooms and layers and suggests cost codes and pricing, you just approve. Turn hours of manual quantity takeoff into minutes.")
+                </p>
+                <div class="landing-hero-actions">
+                    <a href="account/kayit" class="landing-cta-btn">@T("Ücretsiz Başla", "Get Started Free")</a>
+                    <a href="#nasil-calisir" class="landing-secondary-btn">@T("Nasıl çalıştığını gör", "See how it works")</a>
+                </div>
+                <div class="landing-hero-proof">
+                    <span><Icon Name="check" Size="14" /> @T("Onaylanmadan hiçbir satır projeye eklenmez", "Nothing is added to your project without approval")</span>
+                    <span><Icon Name="check" Size="14" /> @T("Resmi ÇŞB birim fiyatlarıyla maliyet analizi", "Cost analysis on official government unit price schedules")</span>
+                </div>
+            </div>
+
+            <div class="landing-hero-visual">
+                <div class="landing-window">
+                    <div class="landing-window-bar">
+                        <span class="landing-window-dot"></span><span class="landing-window-dot"></span><span class="landing-window-dot"></span>
+                        <span class="landing-window-url">drawtally.app/proje/12/import</span>
+                    </div>
+                    <div class="landing-window-body">
+                        <div class="landing-mock-dropzone">
+                            <Icon Name="upload-cloud" Size="22" CssClass="landing-mock-dropzone-icon" />
+                            <div>
+                                <strong>@T("A-Blok-Zemin-Kat.dwg", "A-Block-Ground-Floor.dwg")</strong>
+                                <span>@T("Yükleniyor — katmanlar taranıyor…", "Uploading — scanning layers…")</span>
+                            </div>
+                        </div>
+                        <table class="landing-mock-table">
+                            <thead>
+                                <tr>
+                                    <th>@T("Oda / Katman", "Room / Layer")</th>
+                                    <th>@T("Önerilen Poz", "Suggested Code")</th>
+                                    <th>@T("Güven", "Confidence")</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="landing-row-ok">
+                                    <td>@T("Ofis 204 — 142.5 m²", "Office 204 — 142.5 m²")</td>
+                                    <td>Y.16.001 — @T("Sıva işleri", "Plastering")</td>
+                                    <td><span class="landing-badge landing-badge-ok">@T("Yüksek", "High")</span></td>
+                                    <td><Icon Name="check" Size="14" CssClass="landing-row-ok-icon" /></td>
+                                </tr>
+                                <tr class="landing-row-ok">
+                                    <td>@T("Koridor — 38.2 m²", "Corridor — 38.2 m²")</td>
+                                    <td>Y.15.150 — @T("Seramik kaplama", "Ceramic tiling")</td>
+                                    <td><span class="landing-badge landing-badge-ok">@T("Yüksek", "High")</span></td>
+                                    <td><Icon Name="check" Size="14" CssClass="landing-row-ok-icon" /></td>
+                                </tr>
+                                <tr class="landing-row-warn">
+                                    <td>@T("Depo 3 — 19.8 m²", "Storage 3 — 19.8 m²")</td>
+                                    <td>Y.21.004 — @T("Şap imalatı", "Screed works")</td>
+                                    <td><span class="landing-badge landing-badge-warn">@T("Orta", "Medium")</span></td>
+                                    <td><button class="landing-mock-approve">@T("Onayla", "Approve")</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="landing-steps" id="nasil-calisir">
+        <div class="landing-container">
+            <div class="landing-section-head">
+                <span class="landing-eyebrow">@T("Nasıl Çalışır", "How It Works")</span>
+                <h2>@T("Üç adımda çizimden onaylı metraja", "From drawing to approved takeoff in three steps")</h2>
+                <p>@T("Her adım gerçek ürün ekranını yansıtır — soyut ikonlar değil.", "Every step mirrors the real product screen — not abstract icons.")</p>
+            </div>
+
+            <div class="landing-steps-grid">
+                <div class="landing-step-card">
+                    <div class="landing-step-num">1</div>
+                    <h3>@T("Projelerini Yükle (DWG/PDF)", "Upload Your Projects (DWG/PDF)")</h3>
+                    <p>@T("Dosyayı sürükle bırak, ya da tıklayıp seç. Vektörel PDF, DWG ve DXF desteklenir.", "Drag and drop, or click to select. Vector PDF, DWG and DXF are supported.")</p>
+                    <div class="landing-step-mock">
+                        <div class="dropzone landing-step-dropzone">
+                            <div class="dropzone-content">
+                                <div class="dropzone-icon"><Icon Name="upload-cloud" Size="24" /></div>
+                                <div class="dropzone-title">@T("Projelerinizi Yükleyin", "Upload Your Projects")</div>
+                                <span class="dropzone-sub">@T("veya sürükleyip bırakın", "or drag and drop")</span>
+                                <div class="dropzone-formats">CSV · PDF · DWG · DXF</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="landing-step-card">
+                    <div class="landing-step-num">2</div>
+                    <h3>@T("Yapay Zeka Katmanları Analiz Eder", "AI Analyzes the Layers")</h3>
+                    <p>@T("Her katman/oda için geometrik sinyal okunur ve bir poz kodu önerilir; güven skoru düşükse öneri ayrıca işaretlenir.", "Each layer/room's geometric signal is read and a cost code is suggested; low-confidence matches are flagged separately.")</p>
+                    <div class="landing-step-mock landing-analysis-card">
+                        <div class="landing-analysis-row">
+                            <span class="landing-analysis-label">@T("Katman", "Layer")</span>
+                            <strong>A-ZEMIN-ODA-204</strong>
+                        </div>
+                        <div class="landing-analysis-row">
+                            <span class="landing-analysis-label">@T("Geometrik Sinyal", "Geometric Signal")</span>
+                            <span>@T("Kapalı poligon · 142.5 m²", "Closed polygon · 142.5 m²")</span>
+                        </div>
+                        <div class="landing-analysis-row">
+                            <span class="landing-analysis-label">@T("Önerilen Poz", "Suggested Code")</span>
+                            <span>Y.16.001 — @T("Sıva işleri", "Plastering")</span>
+                        </div>
+                        <div class="landing-analysis-confidence">
+                            <span class="landing-badge landing-badge-ok"><Icon Name="check" Size="12" /> @T("Yüksek Güven", "High Confidence")</span>
+                            <span class="landing-analysis-model">claude-haiku-4-5</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="landing-step-card">
+                    <div class="landing-step-num">3</div>
+                    <h3>@T("İncele ve Onayla — Metraj Hazır", "Review & Approve — Takeoff Ready")</h3>
+                    <p>@T("Öneriyi düzenle veya olduğu gibi onayla; onaylanan satır anında proje metraj tablosuna eklenir.", "Edit the suggestion or approve as-is; approved rows are added to the project's takeoff table instantly.")</p>
+                    <div class="landing-step-mock">
+                        <table class="landing-mock-table landing-mock-table-final">
+                            <tbody>
+                                <tr class="landing-row-ok">
+                                    <td>Y.16.001 — @T("Sıva işleri", "Plastering")</td>
+                                    <td>142.5 m²</td>
+                                    <td><span class="durum-basarili-mini"><Icon Name="check" Size="12" /> @T("Eklendi", "Added")</span></td>
+                                </tr>
+                                <tr class="landing-row-ok">
+                                    <td>Y.15.150 — @T("Seramik kaplama", "Ceramic tiling")</td>
+                                    <td>38.2 m²</td>
+                                    <td><span class="durum-basarili-mini"><Icon Name="check" Size="12" /> @T("Eklendi", "Added")</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Y.21.004 — @T("Şap imalatı", "Screed works")</td>
+                                    <td>19.8 m²</td>
+                                    <td><button class="landing-mock-approve">@T("Onayla ve Ekle", "Approve & Add")</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="landing-trust" id="guven">
+        <div class="landing-container landing-trust-inner">
+            <div class="landing-trust-copy">
+                <span class="landing-eyebrow"><Icon Name="shield" Size="14" /> @T("Yapay Zeka Şeffaflığı", "AI Transparency")</span>
+                <h2>@T("Yapay zeka önerir, sen onaylarsın.", "AI suggests, you approve.")</h2>
+                <p>
+                    @T("Her yapay zeka önerisi — poz kodu, alan, güven skoru — projeye eklenmeden önce mutlaka bir insan tarafından onaylanır. Hiçbir satır arka planda sessizce eklenmez.",
+                        "Every AI recommendation — cost code, quantity, confidence score — requires human confirmation before it's applied to your project. No row is ever added silently in the background.")
+                </p>
+                <p class="landing-trust-detail">
+                    <Icon Name="zap" Size="15" />
+                    @T("Güven skoru düşük çıkan eşleşmeler otomatik olarak daha hızlı bir modelden daha güçlü bir modele yükseltilir — ekstra maliyeti sadece gerektiğinde, kararı her zaman siz vererek.",
+                        "Low-confidence matches are automatically escalated from a fast model to a stronger one — extra cost only when it's needed, the decision always stays with you.")
+                </p>
+            </div>
+            <div class="landing-trust-visual">
+                <div class="landing-trust-flow">
+                    <div class="landing-trust-node">
+                        <Icon Name="zap" Size="18" />
+                        <span>@T("Hızlı Model", "Fast Model")</span>
+                        <small>claude-haiku-4-5</small>
+                    </div>
+                    <div class="landing-trust-arrow">
+                        <span>@T("güven düşükse", "if low confidence")</span>
+                    </div>
+                    <div class="landing-trust-node">
+                        <Icon Name="cpu" Size="18" />
+                        <span>@T("Güçlü Model", "Strong Model")</span>
+                        <small>claude-sonnet-5</small>
+                    </div>
+                    <div class="landing-trust-arrow">
+                        <span>@T("her zaman", "always")</span>
+                    </div>
+                    <div class="landing-trust-node landing-trust-node-final">
+                        <Icon Name="user-check" Size="18" />
+                        <span>@T("Sizin Onayınız", "Your Approval")</span>
+                        <small>@T("son karar", "final say")</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="landing-features" id="ozellikler">
+        <div class="landing-container">
+            <div class="landing-section-head">
+                <span class="landing-eyebrow">@T("Özellikler", "Features")</span>
+                <h2>@T("Metrajdan hakedişe, tek platform", "From takeoff to progress payments, one platform")</h2>
+            </div>
+            <div class="landing-bento">
+                <div class="landing-bento-tile landing-bento-tile-wide">
+                    <Icon Name="layers" Size="22" CssClass="landing-bento-icon" />
+                    <h3>@T("PDF ve DWG İçe Aktarma", "PDF & DWG Import")</h3>
+                    <p>@T("Vektörel PDF'lerden keşif satırlarını ve çizimlerden oda geometrisini otomatik oku; DWG/DXF'te kapalı poligonlardan alan deterministik hesaplanır.", "Automatically read takeoff lines from vector PDFs and room geometry from drawings; in DWG/DXF, area is computed deterministically from closed polygons.")</p>
+                </div>
+                <div class="landing-bento-tile">
+                    <Icon Name="cpu" Size="22" CssClass="landing-bento-icon" />
+                    <h3>@T("Yapay Zeka Poz Önerisi", "AI-Suggested Cost Codes")</h3>
+                    <p>@T("Her oda ve katman için en uygun poz kodu önerilir, onaylanana kadar projeye eklenmez.", "The best-matching cost code is suggested for every room and layer, never applied until approved.")</p>
+                </div>
+                <div class="landing-bento-tile">
+                    <Icon Name="calculator" Size="22" CssClass="landing-bento-icon" />
+                    <h3>@T("Maliyet Analizi", "Cost Analysis")</h3>
+                    <p>@T("Resmi ÇŞB birim fiyat cetvellerine dayalı, güncel ve denetlenebilir maliyet hesaplaması.", "Up-to-date, auditable cost calculation based on official government unit price schedules.")</p>
+                </div>
+                <div class="landing-bento-tile">
+                    <Icon Name="file-text" Size="22" CssClass="landing-bento-icon" />
+                    <h3>@T("Proje ve Hakediş Yönetimi", "Project & Progress Payment Management")</h3>
+                    <p>@T("İlerlemeyi takip et, hakediş dönemlerini yönet, tüm proje geçmişini tek yerde tut.", "Track progress, manage progress payment (hakediş) periods, keep the full project history in one place.")</p>
+                </div>
+                <div class="landing-bento-tile landing-bento-tile-wide">
+                    <Icon Name="grid" Size="22" CssClass="landing-bento-icon" />
+                    <h3>@T("Çoklu Proje Panosu", "Multi-Project Dashboard")</h3>
+                    <p>@T("Tüm projelerini, toplam metraj kalemi sayısını ve toplam keşif bedelini tek bir panodan izle.", "Monitor every project, total takeoff item count and total estimated cost from a single dashboard.")</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="landing-final-cta">
+        <div class="landing-container landing-final-cta-inner">
+            <h2>@T("İlk çizimini yükle, farkı gör.", "Upload your first drawing, see the difference.")</h2>
+            <p>@T("Kredi kartı gerekmez. Dakikalar içinde ilk projeni oluştur.", "No credit card required. Set up your first project in minutes.")</p>
+            <a href="account/kayit" class="landing-cta-btn">@T("Ücretsiz Başla", "Get Started Free")</a>
+        </div>
+    </section>
+
+    <footer class="landing-footer">
+        <div class="landing-container landing-footer-inner">
+            <div class="landing-brand">
+                <img src="images/brand/drawtally-icon-only.svg" alt="" class="landing-brand-mark" />
+                <span class="landing-brand-text">
+                    <span class="landing-brand-name">DrawTally</span>
+                    <span class="landing-brand-sub">by Drongos Global</span>
+                </span>
+            </div>
+            <div class="landing-footer-links">
+                <a href="account/kosullar">@T("Kullanım Koşulları", "Terms of Use")</a>
+                <a href="account/giris">@T("Giriş Yap", "Log in")</a>
+            </div>
+            <span class="landing-footer-copyright">© @DateTime.Now.Year Drongos Global</span>
+        </div>
+    </footer>
+}
+
+@code {
+    private string lang = "tr";
+    private bool checking = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            Nav.NavigateTo("/projeler", replace: true);
+            return;
+        }
+        checking = false;
+    }
+
+    private string T(string tr, string en) => lang == "tr" ? tr : en;
+
+    private void ToggleLang() => lang = lang == "tr" ? "en" : "tr";
+}
