@@ -30,14 +30,18 @@ builder.Services.AddSingleton<PozKutuphanesi>();
 builder.Services.AddScoped<VeriDeposu>();
 
 // PDF/DWG çizim analizi (oda adı + alan çıkarımı): appsettings.json'daki "AiProvider"
-// ("Anthropic" | "Nvidia") ayarına göre hangi AI sağlayıcısının kullanılacağını seçer.
-if (builder.Configuration["AiProvider"] == "Nvidia")
+// ("Anthropic" | "Nvidia" | "Gemini") ayarına göre hangi AI sağlayıcısının kullanılacağını seçer.
+switch (builder.Configuration["AiProvider"])
 {
-    builder.Services.AddHttpClient<IAiClassificationProvider, NvidiaNimProvider>();
-}
-else
-{
-    builder.Services.AddHttpClient<IAiClassificationProvider, AnthropicClassificationProvider>();
+    case "Nvidia":
+        builder.Services.AddHttpClient<IAiClassificationProvider, NvidiaNimProvider>();
+        break;
+    case "Gemini":
+        builder.Services.AddHttpClient<IAiClassificationProvider, GeminiClassificationProvider>();
+        break;
+    default:
+        builder.Services.AddHttpClient<IAiClassificationProvider, AnthropicClassificationProvider>();
+        break;
 }
 builder.Services.AddTransient<AiSiniflandirmaServisi>();
 
