@@ -162,7 +162,7 @@ public class CizimAnalizServisi
     /// (3) Yatay ama tek başına kısa bir sayı olan kelimeler (ölçü/kot rakamı) elenir — bunlar
     ///     genelde oda etiketine çok yakın konumlandığından X/Y kümeleme sezgisiyle ayıklanamıyordu.
     /// </summary>
-    private static List<Word> KelimeleriDuzelt(List<Word> kelimeler)
+    internal static List<Word> KelimeleriDuzelt(List<Word> kelimeler)
     {
         var sonuc = new List<Word>(kelimeler.Count);
         foreach (var kelime in kelimeler)
@@ -214,7 +214,17 @@ public class CizimAnalizServisi
     /// kümeye birleşebiliyordu — bu da hem gerçek oda etiketlerinin kayboluşuna (hepsi tek bir
     /// anlamsız metin yığınına gömülüyor) hem de AI'ya anlamsız/dev bir metin gönderilmesine yol açtı.
     /// </summary>
-    private static List<(string Metin, double Sol, double Alt, double Sag, double Ust)> MetinKumeleriOlustur(List<Word> kelimeler)
+    internal readonly record struct FizikselSatir(string Metin, double Ust, double Alt, double Sol, double Sag, double Yukseklik, bool TersYonlu);
+
+    /// <summary>
+    /// Kelimeleri (aynı yükseklikte VE yatayda birbirine yakın olanları) fiziksel satırlara gruplar.
+    /// Hem oda-etiketi kümeleme (<see cref="MetinKumeleriOlustur"/>) hem de düz keşif/metraj PDF
+    /// satır taraması (<see cref="VeriDeposu.ProjeyePdfImportEt"/>) bu metodu kullanır — ikisi de
+    /// PdfPig'in ham <c>Page.Text</c> özelliğini KULLANMAZ, çünkü o metni sayfadaki içerik akışı
+    /// sırasına göre birleştirir; mimari bir çizim gibi lineer olmayan bir sayfada bu, sayfanın
+    /// tamamen farklı yerlerindeki metinlerin yan yana yapışmasına yol açar.
+    /// </summary>
+    internal static List<FizikselSatir> FizikselSatirlaraGrupla(List<Word> kelimeler)
     {
         var satirlar = new List<List<Word>>();
         foreach (var kelime in kelimeler.OrderByDescending(k => k.BoundingBox.Top))
@@ -237,26 +247,41 @@ public class CizimAnalizServisi
             else satirlar.Add(new List<Word> { kelime });
         }
 
-        var satirBilgisi = satirlar
-            .Select(s => new
+        return satirlar
+            .Select(s =>
             {
                 // 180° döndürülmüş (baş aşağı) bir satırda okuma yönü de ters olduğundan, kelimeler
                 // Left'e göre ARTAN sırada dizilirse kelime SIRASI da ters çıkar (ör. "SAYAÇ ODASI"
                 // yerine "ODASI SAYAÇ") — KelimeleriDuzelt zaten kelimelerin kendi harflerini
                 // düzeltti, burada da (satırın tamamı Rotate180 ise) sıralama yönü tersine çevrilir.
-                TersYonlu = s.All(k => k.TextOrientation == TextOrientation.Rotate180),
-                Metin = string.Join(" ", (s.All(k => k.TextOrientation == TextOrientation.Rotate180)
-                        ? s.OrderByDescending(k => k.BoundingBox.Left)
-                        : s.OrderBy(k => k.BoundingBox.Left))
-                    .Select(k => k.Text)),
-                Ust = s.Max(k => k.BoundingBox.Top),
-                Alt = s.Min(k => k.BoundingBox.Bottom),
-                Sol = s.Min(k => k.BoundingBox.Left),
-                Sag = s.Max(k => k.BoundingBox.Right),
-                Yukseklik = Math.Max(s.Average(k => k.BoundingBox.Height), 1)
+                var tersYonlu = s.All(k => k.TextOrientation == TextOrientation.Rotate180);
+                return new FizikselSatir(
+                    Metin: string.Join(" ", (tersYonlu ? s.OrderByDescending(k => k.BoundingBox.Left) : s.OrderBy(k => k.BoundingBox.Left)).Select(k => k.Text)),
+                    Ust: s.Max(k => k.BoundingBox.Top),
+                    Alt: s.Min(k => k.BoundingBox.Bottom),
+                    Sol: s.Min(k => k.BoundingBox.Left),
+                    Sag: s.Max(k => k.BoundingBox.Right),
+                    Yukseklik: Math.Max(s.Average(k => k.BoundingBox.Height), 1),
+                    TersYonlu: tersYonlu);
             })
             .OrderByDescending(s => s.Ust)
             .ToList();
+    }
+
+    /// <summary>Düz keşif/metraj PDF'lerinde (bkz. VeriDeposu.ProjeyePdfImportEt) satır satır tarama
+    /// için kullanılan metin çıkarımı — döndürülmüş metinler düzeltilir, satırlar X/Y konumuna göre
+    /// doğru sırayla oluşturulur (ham Page.Text'in aksine).</summary>
+    internal static List<string> DuzMetinSatirlariniCikar(Page sayfa)
+    {
+        var kelimeler = KelimeleriDuzelt(sayfa.GetWords().ToList());
+        return kelimeler.Count == 0
+            ? new List<string>()
+            : FizikselSatirlaraGrupla(kelimeler).Select(s => s.Metin).ToList();
+    }
+
+    private static List<(string Metin, double Sol, double Alt, double Sag, double Ust)> MetinKumeleriOlustur(List<Word> kelimeler)
+    {
+        var satirBilgisi = FizikselSatirlaraGrupla(kelimeler);
 
         // NOT: sadece "en son oluşturulan kümeye" bakmak (eski sürüm) yan yana duran etiketlerde
         // (ör. solda "MUTFAK", sağda "BANYO" aynı Y bandında) hatalı bölünmeye yol açar: satırlar

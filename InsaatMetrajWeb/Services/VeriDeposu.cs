@@ -178,8 +178,14 @@ public class VeriDeposu
 
         foreach (var sayfa in pdf.GetPages())
         {
-            var sayfaMetni = sayfa.Text;
-            var satirlar = sayfaMetni.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            // NOT: sayfa.Text (PdfPig'in ham metni) KULLANILMIYOR — o, sayfadaki metni içerik akışı
+            // sırasına göre birleştirir; mimari bir çizim gibi lineer olmayan bir sayfada bu, sayfanın
+            // tamamen farklı yerlerindeki metinlerin (ör. "MUTFAK" etiketiyle uzak bir notun) yan yana
+            // yapışmasına yol açar. Bunun yerine kelimeler X/Y konumuna göre fiziksel satırlara
+            // gruplanır (bkz. CizimAnalizServisi.DuzMetinSatirlariniCikar) — bu aynı zamanda döndürülmüş
+            // (90/270°) ölçü rakamlarını eler ve 180° döndürülmüş etiketlerin ters karakter/kelime
+            // sırasını düzeltir.
+            var satirlar = CizimAnalizServisi.DuzMetinSatirlariniCikar(sayfa);
 
             foreach (var hamSatir in satirlar)
             {
