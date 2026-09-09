@@ -68,12 +68,20 @@ public class NvidiaNimProvider : IAiClassificationProvider
             }
         };
 
-        using var istek = new HttpRequestMessage(HttpMethod.Post, Endpoint);
-        istek.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
-        istek.Content = new StringContent(JsonSerializer.Serialize(istekGovdesi), Encoding.UTF8, "application/json");
+        var govdeJson = JsonSerializer.Serialize(istekGovdesi);
+        HttpRequestMessage IstekOlustur()
+        {
+            var istek = new HttpRequestMessage(HttpMethod.Post, Endpoint);
+            istek.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+            istek.Content = new StringContent(govdeJson, Encoding.UTF8, "application/json");
+            return istek;
+        }
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var cevap = await _http.SendAsync(istek, cts.Token);
+        // 429 (Too Many Requests) / 503 gibi geçici hatalar, sınırlı paralellikle de olsa aynı anda
+        // birçok satırın işlendiği DWG akışında sağlayıcı limiti aşılınca sıkça görülüyordu — bkz.
+        // AiHttpRetryYardimcisi. Burada otomatik yeniden denenir, kalıcı bir hata değilse kullanıcıya
+        // ham "API 429 döndü" hatası olarak sızmaz.
+        using var cevap = await AiHttpRetryYardimcisi.GonderYenidenDenemeli(_http, IstekOlustur, TimeSpan.FromSeconds(30));
         var cevapMetni = await cevap.Content.ReadAsStringAsync();
 
         if (!cevap.IsSuccessStatusCode)

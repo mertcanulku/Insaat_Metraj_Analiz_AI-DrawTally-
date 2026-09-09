@@ -87,4 +87,11 @@ public class OdaYapilandirmaSonucu
     public int? OnerilenPozId { get; set; }
     public string Gerekce { get; set; } = "";
     public string KullanilanModel { get; set; } = "";
+
+    /// <summary>AI'nın bu girdinin gerçekten bir oda/yapı elemanı olup olmadığına dair kararı.
+    /// false ise (ör. genel proje notu, malzeme şartnamesi, revizyon bilgisi, yön oku, pafta/lejant/
+    /// kuzey oku/ölçek çubuğu gibi çizim süsü), satır sonuca hiç eklenmez — OdaAdi/AlanM2 gibi diğer
+    /// alanlar bu durumda anlamsız/tahmini olabilir. Varsayılan true: eski/parse-edilemeyen yanıtlarda
+    /// (ör. hata durumunda üretilen sonuçlar) satırın filtrelenmeden geçmesi için.</summary>
+    public bool Ilgili { get; set; } = true;
 }

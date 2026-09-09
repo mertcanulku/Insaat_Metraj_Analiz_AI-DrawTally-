@@ -26,6 +26,9 @@ internal static class AiSiniflandirmaYaniti
             ? pozIdEl.GetInt32() : null;
         int guven = root.TryGetProperty("guven", out var guvenEl) ? guvenEl.GetInt32() : 0;
         string gerekce = root.TryGetProperty("gerekce", out var gerekceEl) ? gerekceEl.GetString() ?? "" : "";
+        // Alan yoksa (eski/beklenmedik yanıt biçimi) varsayılan true — satır filtrelenmeden geçer,
+        // ancak model şemayı takip ettiği sürece bu alan her zaman gelir.
+        bool ilgili = !root.TryGetProperty("ilgili", out var ilgiliEl) || ilgiliEl.ValueKind != JsonValueKind.False;
 
         return new OdaYapilandirmaSonucu
         {
@@ -34,7 +37,8 @@ internal static class AiSiniflandirmaYaniti
             KatAdi = kat,
             OnerilenPozId = pozId,
             Guven = guven,
-            Gerekce = gerekce
+            Gerekce = gerekce,
+            Ilgili = ilgili
         };
     }
 }

@@ -55,7 +55,8 @@ public class CizimAnalizServisi
             foreach (var sayfa in pdf.GetPages())
             {
                 // 2.5 — ardışık tekrarı en başta çök (OCR damga/kaşe artefaktı ihtimaline karşı).
-                var hamKelimeler = CizimGurultuFiltresi.ArdisikTekrariColaps(sayfa.GetWords().ToList(), w => w.Text);
+                // Öncesinde döndürülmüş metinler düzeltilir/elenir — bkz. KelimeleriDuzelt.
+                var hamKelimeler = CizimGurultuFiltresi.ArdisikTekrariColaps(KelimeleriDuzelt(sayfa.GetWords().ToList()), w => w.Text);
                 var kumeler = hamKelimeler.Count == 0
                     ? new List<(string, double, double, double, double)>()
                     : MetinKumeleriOlustur(hamKelimeler);
@@ -78,7 +79,8 @@ public class CizimAnalizServisi
                 // Taranmış (resim) sayfa — metin katmanı yok, doğrudan görsele bak.
                 var gorsel = SayfaGorseliOlustur(pdfBaytlari, sayfaVerisi.SayfaNo, sayfaVerisi.Genislik, sayfaVerisi.Yukseklik, kirpma: null);
                 var oda = await _ai.GorseldenOdaCikarAsync(gorsel, _veri.Pozlar, disiplin);
-                sonuclar.Add(SonucaCevir(oda, KaynakTuru.AIGorsel, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi));
+                if (oda.Ilgili)
+                    sonuclar.Add(SonucaCevir(oda, KaynakTuru.AIGorsel, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi));
                 continue;
             }
 
@@ -96,7 +98,10 @@ public class CizimAnalizServisi
                 var oda = await _ai.MetinKumesindenOdaCikarAsync(kume.Metin, _veri.Pozlar, disiplin);
                 var kaynak = KaynakTuru.VektorMetin;
 
-                if (oda.Guven < GorselFallbackGuvenEsigi)
+                // Görsel teyide sadece AI ilgili bir oda/eleman bulduğunu ama düşük güvenle
+                // bulduğunu söylediğinde başvurulur — zaten irrelevant kararı için görsele
+                // bakmanın bir faydası yok.
+                if (oda.Ilgili && oda.Guven < GorselFallbackGuvenEsigi)
                 {
                     // Metin kümesi belirsiz — o bölgenin kırpılmış görselini yapay zeka görüşüne gönder.
                     var gorsel = SayfaGorseliOlustur(pdfBaytlari, sayfaVerisi.SayfaNo, sayfaVerisi.Genislik, sayfaVerisi.Yukseklik,
@@ -109,7 +114,10 @@ public class CizimAnalizServisi
                     }
                 }
 
-                sonuclar.Add(SonucaCevir(oda, kaynak, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi));
+                // AI bu metin kümesinin bir oda/yapı elemanı olmadığına karar verdiyse (genel proje
+                // notu, malzeme şartnamesi, revizyon bilgisi, yön oku vb.) satır hiç eklenmez.
+                if (oda.Ilgili)
+                    sonuclar.Add(SonucaCevir(oda, kaynak, $"Sayfa {sayfaVerisi.SayfaNo}", disiplin, dosyaAdi));
             }
         }
 
@@ -136,10 +144,75 @@ public class CizimAnalizServisi
     private static GuvenSkoru GuveneCevir(int guven) =>
         guven >= 80 ? GuvenSkoru.Yuksek : guven >= 50 ? GuvenSkoru.Orta : GuvenSkoru.Dusuk;
 
+    // Tek başına 1-3 haneli bir sayı (nokta/virgül/birim yok) — mimari çizimlerde ölçü zinciri veya
+    // kot rakamı olarak neredeyse her yerde bulunur, tek başına asla bir oda etiketinin parçası
+    // değildir. "Alan : 49.65 m²" gibi ondalıklı/birim taşıyan sayılar bu deseni EŞLEŞTİRMEZ.
+    private static readonly Regex TekBasinaKisaSayiDeseni = new(@"^\d{1,3}$", RegexOptions.Compiled);
+
     /// <summary>
-    /// Kelimeleri önce satırlara (aynı yükseklikte, yakın Y merkezli), sonra dikey
-    /// boşluğu küçük olan komşu satırları tek bir kümeye (ör. "Yatak Odası" + "alan: 14.2 m²")
-    /// birleştirir. Kesin bir tablo/etiket yapısı varsayılmaz — bu bir sezgisel gruplama.
+    /// PDF'ten çıkarılan ham kelime listesini kümelemeye göndermeden önce düzeltir:
+    /// (1) Dikey yazılmış (90°/270° döndürülmüş) kelimeler tamamen elenir — gerçek bir mimari
+    ///     çizimde bu, neredeyse her zaman ölçü zinciri/detay çiziminin tek haneli rakamlarıdır
+    ///     (bu dosyada sayfadaki kelimelerin yarısından fazlası bu türdendi) ve bir oda etiketiyle
+    ///     karışırsa X/Y yakınlık sezgisi bile onu ayıklayamaz.
+    /// (2) 180° döndürülmüş (baş aşağı) kelimelerde PdfPig bazen karakterleri ters sırayla
+    ///     döndürüyor (ör. "YANGIN KAPISI" etiketinin bir parçası "GNAY"/"ISIPAK" olarak geliyor) —
+    ///     harfleri ters çevirerek okunabilir hale getirilir (doğrulandı: "ISIPAK"→"KAPISI",
+    ///     "AMALPAK"→"KAPLAMA", "022/001"→"100/220").
+    /// (3) Yatay ama tek başına kısa bir sayı olan kelimeler (ölçü/kot rakamı) elenir — bunlar
+    ///     genelde oda etiketine çok yakın konumlandığından X/Y kümeleme sezgisiyle ayıklanamıyordu.
+    /// </summary>
+    private static List<Word> KelimeleriDuzelt(List<Word> kelimeler)
+    {
+        var sonuc = new List<Word>(kelimeler.Count);
+        foreach (var kelime in kelimeler)
+        {
+            if (kelime.TextOrientation is TextOrientation.Rotate90 or TextOrientation.Rotate270)
+                continue;
+
+            if (kelime.TextOrientation == TextOrientation.Rotate180)
+            {
+                sonuc.Add(new Word(kelime.Letters.Reverse().ToList()));
+                continue;
+            }
+
+            if (TekBasinaKisaSayiDeseni.IsMatch(kelime.Text.Trim()))
+                continue;
+
+            sonuc.Add(kelime);
+        }
+        return sonuc;
+    }
+
+    // Aynı fiziksel satırdaki kelimeler arasındaki yatay boşluk, satır yüksekliğinin bu katından
+    // fazla olamaz — aksi halde sayfanın tamamen başka bir yerindeki (aynı Y yüksekliğine denk
+    // gelen) alakasız bir kelime aynı "satır"a eklenir (bkz. YatayYakinlikliSatirGrubu notu).
+    private const double SatirYatayBoslukKatsayisi = 5.0;
+
+    // İki ardışık satırın aynı kümeye (etikete) ait sayılması için, dikey boşluğun küçük olması
+    // yetmez — yatay aralıkları da örtüşmeli/yakın olmalı (bir oda adı ile altındaki "Alan: X m²"
+    // satırı genelde aynı X aralığında/soldan hizalıdır). Bu olmadan mimari bir çizimde sayfanın
+    // her yerine dağılmış metinler (oda etiketleri, notlar, ölçü zincirleri) sırf dikey boşluk
+    // küçük diye tek bir dev kümede birleşiyordu.
+    private const double KumeYatayOrtusmeToleransKatsayisi = 1.5;
+
+    // Tipik bir oda etiketi bloğu (ODA ADI / Alan: X m² / DÖŞ:.. / DUVAR:.. / TAVAN:..) en fazla
+    // ~5 satırdır. Bazı odaların (ör. SIĞINAK) hemen yanına/altına fiziksel olarak yazılmış uzun
+    // NOT: metinleri, X/Y sezgisiyle mükemmel ayrılamayabiliyor — bunun yerine bir kümenin büyümesine
+    // burada sert bir tavan konur: tavana ulaşan bir küme artık yeni satır kabul etmez, taşan satırlar
+    // ayrı bir kümeye düşer (ve büyük olasılıkla ayrı bir kümede gürültü filtresine takılır/AI
+    // tarafından "ilgisiz" işaretlenir) — böylece en azından odanın kendi etiketi kirlenmeden kalır.
+    private const int KumeMaksimumSatir = 6;
+
+    /// <summary>
+    /// Kelimeleri önce satırlara (aynı yükseklikte VE yatayda birbirine yakın), sonra hem dikey
+    /// boşluğu küçük HEM de yatayda örtüşen/yakın komşu satırları tek bir kümeye (ör. "Yatak Odası"
+    /// + "alan: 14.2 m²") birleştirir. Kesin bir tablo/etiket yapısı varsayılmaz — bu bir sezgisel
+    /// gruplama. Yatay kısıt olmadan (eski sürüm) mimari çizimlerde aynı Y-bandına denk gelen ama
+    /// sayfanın tamamen farklı yerlerindeki metinler (ör. sol üstteki bir oda etiketiyle sağ alttaki
+    /// bir ölçü zinciri) aynı "satır"a, ardından zincirleme olarak neredeyse tüm sayfa tek bir devasa
+    /// kümeye birleşebiliyordu — bu da hem gerçek oda etiketlerinin kayboluşuna (hepsi tek bir
+    /// anlamsız metin yığınına gömülüyor) hem de AI'ya anlamsız/dev bir metin gönderilmesine yol açtı.
     /// </summary>
     private static List<(string Metin, double Sol, double Alt, double Sag, double Ust)> MetinKumeleriOlustur(List<Word> kelimeler)
     {
@@ -151,7 +224,14 @@ public class CizimAnalizServisi
             {
                 var ortMerkez = s.Average(k => (k.BoundingBox.Top + k.BoundingBox.Bottom) / 2);
                 var ortYukseklik = Math.Max(s.Average(k => k.BoundingBox.Height), 1);
-                return Math.Abs(merkezY - ortMerkez) < ortYukseklik * 0.6;
+                if (Math.Abs(merkezY - ortMerkez) >= ortYukseklik * 0.6) return false;
+
+                var satirSolu = s.Min(k => k.BoundingBox.Left);
+                var satirSagi = s.Max(k => k.BoundingBox.Right);
+                var yatayBosluk = kelime.BoundingBox.Left > satirSagi ? kelime.BoundingBox.Left - satirSagi
+                    : kelime.BoundingBox.Right < satirSolu ? satirSolu - kelime.BoundingBox.Right
+                    : 0; // kelime zaten satırın X aralığıyla örtüşüyor
+                return yatayBosluk < ortYukseklik * SatirYatayBoslukKatsayisi;
             });
             if (satir != null) satir.Add(kelime);
             else satirlar.Add(new List<Word> { kelime });
@@ -160,7 +240,15 @@ public class CizimAnalizServisi
         var satirBilgisi = satirlar
             .Select(s => new
             {
-                Metin = string.Join(" ", s.OrderBy(k => k.BoundingBox.Left).Select(k => k.Text)),
+                // 180° döndürülmüş (baş aşağı) bir satırda okuma yönü de ters olduğundan, kelimeler
+                // Left'e göre ARTAN sırada dizilirse kelime SIRASI da ters çıkar (ör. "SAYAÇ ODASI"
+                // yerine "ODASI SAYAÇ") — KelimeleriDuzelt zaten kelimelerin kendi harflerini
+                // düzeltti, burada da (satırın tamamı Rotate180 ise) sıralama yönü tersine çevrilir.
+                TersYonlu = s.All(k => k.TextOrientation == TextOrientation.Rotate180),
+                Metin = string.Join(" ", (s.All(k => k.TextOrientation == TextOrientation.Rotate180)
+                        ? s.OrderByDescending(k => k.BoundingBox.Left)
+                        : s.OrderBy(k => k.BoundingBox.Left))
+                    .Select(k => k.Text)),
                 Ust = s.Max(k => k.BoundingBox.Top),
                 Alt = s.Min(k => k.BoundingBox.Bottom),
                 Sol = s.Min(k => k.BoundingBox.Left),
@@ -170,27 +258,57 @@ public class CizimAnalizServisi
             .OrderByDescending(s => s.Ust)
             .ToList();
 
+        // NOT: sadece "en son oluşturulan kümeye" bakmak (eski sürüm) yan yana duran etiketlerde
+        // (ör. solda "MUTFAK", sağda "BANYO" aynı Y bandında) hatalı bölünmeye yol açar: satırlar
+        // global Y sırasına göre işlendiği için iki etiketin "alan" alt satırları küresel sırada
+        // birbirine karışır (MUTFAK'ın alanı, BANYO satırından hemen sonra gelebilir) — bu durumda
+        // "son küme" artık MUTFAK'ın değil BANYO'nun kümesi olur ve MUTFAK'ın alan satırı hiçbir
+        // kümeye uyum sağlayamayıp kendi başına ayrı (yanlış) bir kümeye düşer. Bunun yerine her
+        // yeni satır için AÇIK OLAN TÜM kümeler arasından (son satırı dikey+yatay olarak uyan)
+        // en iyi eşleşen aranır.
         var kumeIndeksleri = new List<List<int>>();
         for (int i = 0; i < satirBilgisi.Count; i++)
         {
-            var mevcutKume = kumeIndeksleri.Count > 0 ? kumeIndeksleri[^1] : null;
-            if (mevcutKume != null)
+            var yeniSatir = satirBilgisi[i];
+            List<int>? enIyiKume = null;
+            double enKucukDikeyBosluk = double.MaxValue;
+
+            foreach (var aday in kumeIndeksleri)
             {
-                var oncekiSatir = satirBilgisi[mevcutKume[^1]];
-                var dikeyBosluk = oncekiSatir.Alt - satirBilgisi[i].Ust;
-                if (dikeyBosluk < oncekiSatir.Yukseklik * 1.8)
+                if (aday.Count >= KumeMaksimumSatir) continue;
+
+                var oncekiSatir = satirBilgisi[aday[^1]];
+                var dikeyBosluk = oncekiSatir.Alt - yeniSatir.Ust;
+                if (dikeyBosluk < 0 || dikeyBosluk >= oncekiSatir.Yukseklik * 1.8) continue;
+
+                var yatayToleransi = oncekiSatir.Yukseklik * KumeYatayOrtusmeToleransKatsayisi;
+                var yatayOrtusuyorMu = yeniSatir.Sol < oncekiSatir.Sag + yatayToleransi &&
+                                        yeniSatir.Sag > oncekiSatir.Sol - yatayToleransi;
+                if (!yatayOrtusuyorMu) continue;
+
+                if (dikeyBosluk < enKucukDikeyBosluk)
                 {
-                    mevcutKume.Add(i);
-                    continue;
+                    enKucukDikeyBosluk = dikeyBosluk;
+                    enIyiKume = aday;
                 }
             }
-            kumeIndeksleri.Add(new List<int> { i });
+
+            if (enIyiKume != null) enIyiKume.Add(i);
+            else kumeIndeksleri.Add(new List<int> { i });
         }
 
         return kumeIndeksleri
             .Select(k => k.Select(i => satirBilgisi[i]).ToList())
             .Select(satirlarSecili => (
-                Metin: string.Join("\n", satirlarSecili.Select(s => s.Metin)),
+                // Kümenin tamamı 180° döndürülmüş satırlardan oluşuyorsa (baş aşağı yazılmış bir
+                // etiket bloğu — ör. "SAYAÇ ODASI"), dikey okuma yönü de terstir: sayfa koordinatında
+                // Y'si en büyük satır aslında etiketin mantıksal EN ALT satırıdır. Satırlar bu
+                // yönteme kadar hep Y-azalan (sayfanın üstünden altına) sırayla eklendiğinden, böyle
+                // bir kümede satır sırası ters çevrilir.
+                Metin: string.Join("\n", (satirlarSecili.All(s => s.TersYonlu)
+                        ? Enumerable.Reverse(satirlarSecili)
+                        : satirlarSecili)
+                    .Select(s => s.Metin)),
                 Sol: satirlarSecili.Min(s => s.Sol),
                 Alt: satirlarSecili.Min(s => s.Alt),
                 Sag: satirlarSecili.Max(s => s.Sag),
@@ -387,7 +505,15 @@ public class CizimAnalizServisi
         // kapalı poligon değil blok referansı olarak modellenir; (BlockName, Katman) bazında gruplanıp
         // adet olarak deterministik sayılır. Mimari/Isıtma/Sıhhi çizimlerde de bir blok bulunursa
         // (ör. kapı/pencere sembolleri) aynı şekilde sayılır — bu, poligon yoluna ek, onun yerine değil.
-        var blokGruplari = bloklar.GroupBy(b => (b.BlockName, b.Katman));
+        // Aynı (BlockName, Katman) çifti birden fazla öznitelik varyantı taşıyabilir (ör. aynı "KAPI"
+        // bloğu aynı katmanda hem 90x210 hem 80x210 kapılar için kullanılmış olabilir) — sadece bunlarla
+        // gruplarsak varyantlardan biri rastgele seçilip etikete yazılır, diğerinin kimliği tamamen
+        // kaybolur (sadece toplam adet hayatta kalır). Grup anahtarına öznitelik imzasını (sıralı
+        // "Etiket=Deger" çiftleri) da katarak her varyant kendi satırında ayrı sayılır.
+        var blokGruplari = bloklar.GroupBy(b => (
+            b.BlockName,
+            b.Katman,
+            OznitelikImzasi: string.Join("|", b.Oznitelikler.Select(o => $"{o.Etiket}={o.Deger}").OrderBy(s => s, StringComparer.Ordinal))));
         foreach (var grup in blokGruplari)
         {
             var adet = grup.Count();
@@ -446,14 +572,18 @@ public class CizimAnalizServisi
     // hem de her istek bittiğinde ilerlemeRaporu ile arayüz güncellenebilir.
     private const int AiEsZamanliIstekLimiti = 4;
 
-    /// <summary>Katman adı + geometrik sinyalleri (kapalılık, alan) AI hibrit sınıflandırmaya vererek her odaya bir poz önerisi ekler.
-    /// <paramref name="ilerlemeRaporu"/> verilirse her satır tamamlandığında (Tamamlanan, Toplam) raporlanır — UI'da ilerleme göstermek için.</summary>
-    public async Task DwgPozOnerileriniEkleAsync(List<CizimAnalizSonucu> odalar, string dosyaAdi, IProgress<(int Tamamlanan, int Toplam)>? ilerlemeRaporu = null)
+    /// <summary>Katman adı + geometrik sinyalleri (kapalılık, alan) AI hibrit sınıflandırmaya vererek her odaya bir poz önerisi ekler,
+    /// ve AI'nın gerçek bir yapı elemanı olmadığına (çizim süsü — pafta çerçevesi, kuzey oku, ölçek çubuğu, revizyon bulutu,
+    /// lejant sembolü vb.) karar verdiği satırları sonuçtan çıkarır. Geometrik tespit (kapalı poligon veya adlandırılmış blok
+    /// olması) tek başına gerçek bir elemanın kanıtı değildir — bu metod son sözü yine AI'ya bırakır.
+    /// <paramref name="ilerlemeRaporu"/> verilirse her satır tamamlandığında (Tamamlanan, Toplam) raporlanır — UI'da ilerleme göstermek için.
+    /// Geriye, ilgisiz olarak işaretlenenler çıkarılmış yeni bir liste döner — <paramref name="odalar"/> mutasyona uğramaz.</summary>
+    public async Task<List<CizimAnalizSonucu>> DwgPozOnerileriniEkleAsync(List<CizimAnalizSonucu> odalar, string dosyaAdi, IProgress<(int Tamamlanan, int Toplam)>? ilerlemeRaporu = null)
     {
         int tamamlanan = 0;
         using var esZamanlilikSiniri = new SemaphoreSlim(AiEsZamanliIstekLimiti);
 
-        async Task TekSatirIsle(CizimAnalizSonucu oda)
+        async Task<bool> TekSatirIsle(CizimAnalizSonucu oda)
         {
             await esZamanlilikSiniri.WaitAsync();
             try
@@ -466,11 +596,20 @@ public class CizimAnalizServisi
                         ? $"Uzunluk: {oda.Uzunluk} m (çizgi/hat segmentleri toplamıyla deterministik hesaplandı)"
                         : $"Alan: {oda.AlanM2} m2\nGeometri: kapalı poligon (shoelace ile deterministik hesaplandı)";
 
-                var baglam = $"Kaynak: DWG çizimi ({dosyaAdi})\nOda/eleman adı: {oda.OdaAdi}\nKat: {(string.IsNullOrWhiteSpace(oda.KatAdi) ? "belirtilmemiş" : oda.KatAdi)}\n{olcumSatiri}";
+                // Not: bu satır geometrik olarak tespit edildi (kapalı poligon ya da adlandırılmış blok
+                // referansı) ama bu, gerçek bir yapı elemanı olduğunun kanıtı değil — pafta çerçevesi,
+                // kuzey oku, ölçek çubuğu, revizyon bulutu, lejant sembolü gibi çizim süsleri de aynı
+                // şekilde kapalı poligon veya adlandırılmış blok olarak modellenebilir. Ada/etiket
+                // metnine bakarak bunun gerçek bir eleman mı yoksa çizim süsü mü olduğuna karar ver.
+                var baglam = $"Kaynak: DWG çizimi ({dosyaAdi})\nBu satır geometrik olarak (kapalı poligon veya blok referansı sayımıyla) tespit edildi — bu, gerçek bir yapı elemanı olduğu anlamına gelmez, pafta çerçevesi/kuzey oku/ölçek çubuğu/revizyon bulutu/lejant sembolü gibi çizim süsleri de aynı şekilde geometrik olarak tespit edilir.\nOda/eleman adı: {oda.OdaAdi}\nKat: {(string.IsNullOrWhiteSpace(oda.KatAdi) ? "belirtilmemiş" : oda.KatAdi)}\n{olcumSatiri}";
                 var oneri = await _ai.MetinKumesindenOdaCikarAsync(baglam, _veri.Pozlar, oda.Disiplin);
+                if (!oneri.Ilgili)
+                    return false;
+
                 oda.OnerilenPozId = oneri.OnerilenPozId;
                 oda.OneriGerekcesi = string.IsNullOrWhiteSpace(oneri.Gerekce) ? oda.OneriGerekcesi : oneri.Gerekce;
                 oda.KullanilanModel = string.IsNullOrWhiteSpace(oneri.KullanilanModel) ? oda.KullanilanModel : oneri.KullanilanModel;
+                return true;
             }
             finally
             {
@@ -479,7 +618,8 @@ public class CizimAnalizServisi
             }
         }
 
-        await Task.WhenAll(odalar.Select(TekSatirIsle));
+        var sonuclar = await Task.WhenAll(odalar.Select(async oda => (Oda: oda, Ilgili: await TekSatirIsle(oda))));
+        return sonuclar.Where(x => x.Ilgili).Select(x => x.Oda).ToList();
     }
 
     /// <summary>

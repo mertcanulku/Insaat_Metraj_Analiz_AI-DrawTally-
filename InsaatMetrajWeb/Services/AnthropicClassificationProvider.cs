@@ -63,13 +63,21 @@ public class AnthropicClassificationProvider : IAiClassificationProvider
             messages = new[] { new { role = "user", content = kullaniciIcerik } }
         };
 
-        using var istek = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages");
-        istek.Headers.Add("x-api-key", _apiKey);
-        istek.Headers.Add("anthropic-version", "2023-06-01");
-        istek.Content = new StringContent(JsonSerializer.Serialize(istekGovdesi), Encoding.UTF8, "application/json");
+        var govdeJson = JsonSerializer.Serialize(istekGovdesi);
+        HttpRequestMessage IstekOlustur()
+        {
+            var istek = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages");
+            istek.Headers.Add("x-api-key", _apiKey);
+            istek.Headers.Add("anthropic-version", "2023-06-01");
+            istek.Content = new StringContent(govdeJson, Encoding.UTF8, "application/json");
+            return istek;
+        }
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var cevap = await _http.SendAsync(istek, cts.Token);
+        // 429 (Too Many Requests) / 503 gibi geçici hatalar, sınırlı paralellikle de olsa aynı anda
+        // birçok satırın işlendiği DWG akışında sağlayıcı limiti aşılınca sıkça görülüyordu — bkz.
+        // AiHttpRetryYardimcisi. Burada otomatik yeniden denenir, kalıcı bir hata değilse kullanıcıya
+        // ham "API 429 döndü" hatası olarak sızmaz.
+        using var cevap = await AiHttpRetryYardimcisi.GonderYenidenDenemeli(_http, IstekOlustur, TimeSpan.FromSeconds(30));
         var cevapMetni = await cevap.Content.ReadAsStringAsync();
 
         if (!cevap.IsSuccessStatusCode)

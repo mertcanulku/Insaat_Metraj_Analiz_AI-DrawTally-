@@ -144,15 +144,23 @@ public class AiSiniflandirmaServisi
         return $$"""
             Sen bir inşaat metraj uzmanısın. Sana bir mimari çizimden (PDF veya DWG)
             alınmış bir oda etiketi/metin kümesi ya da o bölgenin görseli verilecek.
-            Görevin: oda adını, alanını (m²) ve varsa kat/seviye adını çıkarmak, ayrıca
-            aşağıdaki poz listesinden bu odaya en uygun kalemi (ör. döşeme kaplaması)
-            önermek.
+
+            ÖNCE karar vermen gereken şey: bu girdi gerçekten bir oda/mekan ya da somut
+            bir yapı elemanı (kolon, kiriş, priz, anahtar, pano, kapı, pencere, kablo/hat vb.)
+            mı, yoksa metraja konu olmayan başka bir şey mi (genel proje notu, malzeme
+            şartnamesi/teknik açıklama, revizyon/onay bilgisi, yön oku veya ölçek/kuzey
+            oku etiketi, pafta/antet/lejant metni, ölçü/kot zinciri, tarih, imza/kaşe alanı
+            vb.)? İkinci durumda bunu tahmin etmeye ÇALIŞMA — "ilgili" alanını false yap
+            ve odaAdi/alanM2/pozId için uydurma bir değer üretme (boş/null bırakabilirsin).
+            Sadece ilk durumda (gerçek bir oda/eleman olduğuna karar verdiysen) oda adını,
+            alanını (m²) ve varsa kat/seviye adını çıkar, ayrıca aşağıdaki poz listesinden
+            bu odaya/elemana en uygun kalemi (ör. döşeme kaplaması) öner.
             {{disiplinBaglami}}
             Poz listesi:
             {{pozListesi}}
 
             SADECE şu JSON formatında cevap ver, başka hiçbir açıklama ekleme:
-            {"odaAdi": "<oda adı>", "alanM2": <sayı veya null>, "kat": "<kat adı veya \"\">", "pozId": <uygun poz id'si veya null>, "guven": <0-100 arası tam sayı>, "gerekce": "<tek cümlelik kısa gerekçe>"}
+            {"ilgili": <true veya false>, "odaAdi": "<oda adı>", "alanM2": <sayı veya null>, "kat": "<kat adı veya \"\">", "pozId": <uygun poz id'si veya null>, "guven": <0-100 arası tam sayı>, "gerekce": "<tek cümlelik kısa gerekçe>"}
             """;
     }
 }

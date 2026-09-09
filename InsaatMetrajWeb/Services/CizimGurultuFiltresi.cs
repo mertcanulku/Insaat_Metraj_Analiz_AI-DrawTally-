@@ -42,6 +42,25 @@ public static class CizimGurultuFiltresi
     private static readonly Regex SayfaNoDeseni = new(@"^\d{1,3}$", RegexOptions.Compiled);
     private static readonly Regex StandartRefDeseni = new(@"^TS\s*\d{3,5}$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // 2.7 — Genel not/şartname bloğu: bir oda etiketi (ör. "YATAK ODASI" + "Alan: 14.2 m²")
+    // gerçekte neredeyse hiç 1-3 satırı/birkaç yüz karakteri geçmez. Çizimlerdeki "GENEL NOTLAR"
+    // paragrafları (yangın dolabı/kapısı ölçüleri, malzeme şartnamesi, yalıtım/sıva/boya notları vb.)
+    // ise onlarca kısa satırın küçük dikey boşluklarla art arda dizilmesinden oluşur — PDF'te
+    // MetinKumeleriOlustur'un satır-birleştirme sezgisi bunları tek bir dev kümede toplayabilir,
+    // DWG'de ise tek bir MTEXT olarak tüm paragrafı taşıyabilir. Bu durumda AI'ya "bu bir oda mı"
+    // diye sormanın (Ilgili alanı) güvenilirliği modelin talimata uyumuna bağlı kalıyor — bunun
+    // yerine burada deterministik bir uzunluk/satır eşiğiyle en baştan elenir.
+    private const int GenelNotMaksimumSatir = 6;
+    private const int GenelNotMaksimumKarakter = 350;
+
+    public static bool GenelNotBlokuMu(string metin)
+    {
+        var m = metin.Trim();
+        if (m.Length == 0) return false;
+        var satirSayisi = m.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
+        return satirSayisi > GenelNotMaksimumSatir || m.Length > GenelNotMaksimumKarakter;
+    }
+
     public static bool KotMu(string metin)
     {
         var m = metin.Trim();
@@ -72,7 +91,7 @@ public static class CizimGurultuFiltresi
     /// <summary>Tek bir metin parçasının (kelime/satır/blok) kesinlikle gürültü olup olmadığını söyler.
     /// Aks/eksen etiketleri (x1, y10) kasıtlı olarak burada YOK — silinmiyor, ayrı kategori (2.3 notu).</summary>
     public static bool GurultuMu(string metin) =>
-        KotMu(metin) || PaftaBilgisiMi(metin) || DigerGurultuMu(metin);
+        KotMu(metin) || PaftaBilgisiMi(metin) || DigerGurultuMu(metin) || GenelNotBlokuMu(metin);
 
     /// <summary>Bir metin bloğunun (birleştirilmiş satır kümesi) ölçü zinciri olup olmadığını
     /// ayrıca kontrol eder — tek kelime düzeyinde değil, birleşik satır/küme metninde uygulanmalı.</summary>

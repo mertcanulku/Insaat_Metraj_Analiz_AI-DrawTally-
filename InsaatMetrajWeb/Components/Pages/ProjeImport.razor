@@ -14,7 +14,7 @@
 }
 else
 {
-    <p><a href="@($"/proje/{ProjeId}")">← @proje.Ad</a></p>
+    <p><a href="@($"/proje/{ProjeId}")"><Icon Name="arrow-left" /> @proje.Ad</a></p>
     <h1>Proje Import</h1>
     <p>Tek bir yükleme alanından dört formatı destekler:</p>
     <ul>
@@ -54,7 +54,7 @@ else
 
     <div class="dropzone" id="proje-import-dropzone">
         <div class="dropzone-content">
-            <div class="dropzone-icon">⇩</div>
+            <div class="dropzone-icon"><Icon Name="upload-cloud" Size="28" /></div>
             <div class="dropzone-title">Dosyayı buraya sürükleyip bırakın</div>
             <span class="dropzone-sub">veya seçmek için tıklayın</span>
             <div class="dropzone-formats">CSV · PDF · DWG · DXF</div>
@@ -63,7 +63,7 @@ else
     </div>
 
     <div class="upload-notice">
-        <span class="upload-notice-icon">ℹ️</span>
+        <span class="upload-notice-icon"><Icon Name="warning" Size="15" /></span>
         <span class="upload-notice-text">
             En iyi sonuç için PDF çizimlerin yüksek çözünürlüklü ve vektörel (taranmış değil) olmasına,
             DWG çizimlerdeki metinlerin patlatılmamış (düzenlenebilir metin nesnesi olarak kalmış) olmasına
@@ -88,7 +88,7 @@ else
 
         <h3>Import Sonucu (@sonYuklenenFormat): @basariliSayisi başarılı, @basarisizSayisi eşleşmedi</h3>
 
-        <table class="veri-tablo">
+        <div class="veri-tablo-wrap"><table class="veri-tablo">
             <thead>
                 <tr>
                     <th>Satır</th>
@@ -104,12 +104,25 @@ else
                     <tr class="@(s.Basarili ? "satir-basarili" : "satir-hatali")">
                         <td>@s.SatirNo</td>
                         <td>@s.HamMetin</td>
-                        <td>@(s.Basarili ? "✓ Başarılı" : (s.PozEksik ? "⚠ Poz seçilmedi" : "✗ Eşleşmedi"))</td>
+                        <td>
+                            @if (s.Basarili)
+                            {
+                                <span class="durum-basarili"><Icon Name="check" /> Başarılı</span>
+                            }
+                            else if (s.PozEksik)
+                            {
+                                <span class="durum-uyari"><Icon Name="warning" /> Poz seçilmedi</span>
+                            }
+                            else
+                            {
+                                <span class="durum-hata"><Icon Name="x" /> Eşleşmedi</span>
+                            }
+                        </td>
                         <td>@s.Mesaj</td>
                         <td>
                             @if (s.Basarili && s.EklenenMetrajKalemiId.HasValue)
                             {
-                                <button @onclick="() => ImportSatiriSil(s)">Sil</button>
+                                <button class="btn-danger" @onclick="() => ImportSatiriSil(s)"><Icon Name="trash" /> Sil</button>
                             }
                             else if (s.PozEksik)
                             {
@@ -120,7 +133,7 @@ else
                     </tr>
                 }
             </tbody>
-        </table>
+        </table></div>
 
         @if (basarisizSayisi > 0)
         {
@@ -134,7 +147,7 @@ else
     {
         <h3>
             Çizim Analizi — Oda/Alan Önerileri (@sonYuklenenFormat)
-            <button @onclick="SonuclariTemizle" title="Aşağıdaki tüm önerileri listeden kaldırır — henüz onaylanmamış satırlar için geri alınamaz, onaylanmış satırlar zaten metraj tablosunda kalır.">Sonuçları Temizle</button>
+            <button class="btn-secondary" @onclick="SonuclariTemizle" title="Aşağıdaki tüm önerileri listeden kaldırır — henüz onaylanmamış satırlar için geri alınamaz, onaylanmış satırlar zaten metraj tablosunda kalır.">Sonuçları Temizle</button>
         </h3>
         <p>
             Aşağıdaki satırlar sadece öneridir; hiçbiri onaylanmadan projenin metraj tablosuna eklenmez.
@@ -183,7 +196,7 @@ else
 }
 
 @code {
-    private RenderFragment OdaSonucTablosu(List<CizimAnalizSonucu> liste) => @<table class="veri-tablo">
+    private RenderFragment OdaSonucTablosu(List<CizimAnalizSonucu> liste) => @<div class="veri-tablo-wrap"><table class="veri-tablo">
         <thead>
             <tr>
                 <th>Oda Adı</th>
@@ -267,8 +280,8 @@ else
                     <td>
                         @if (s.OnaylandiMi)
                         {
-                            <span>✓ Eklendi</span>
-                            <button @onclick="() => OdaSonucuSil(s)">Sil</button>
+                            <span class="durum-basarili"><Icon Name="check" /> Eklendi</span>
+                            <button class="btn-danger" @onclick="() => OdaSonucuSil(s)"><Icon Name="trash" /> Sil</button>
                         }
                         else if (poz != null)
                         {
@@ -282,7 +295,7 @@ else
                 </tr>
             }
         </tbody>
-    </table>;
+    </table></div>;
 }
 
 @code {
@@ -404,8 +417,8 @@ else
             isleniyorMesaji = $"Yapay zeka poz önerisi hazırlıyor... ({p.Tamamlanan} / {p.Toplam})";
             StateHasChanged();
         });
-        await CizimAnalizServisi.DwgPozOnerileriniEkleAsync(yeniSonuclar, e.File.Name, ilerleme);
-        odaSonuclari.AddRange(yeniSonuclar);
+        var ilgiliSonuclar = await CizimAnalizServisi.DwgPozOnerileriniEkleAsync(yeniSonuclar, e.File.Name, ilerleme);
+        odaSonuclari.AddRange(ilgiliSonuclar);
     }
 
     private async Task OdaOnerisiOnayla(int index)
