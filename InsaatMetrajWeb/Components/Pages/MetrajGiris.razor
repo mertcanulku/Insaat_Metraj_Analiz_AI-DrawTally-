@@ -10,7 +10,7 @@
 }
 else
 {
-    <p><a href="@($"/proje/{ProjeId}")">← @proje.Ad</a></p>
+    <p><a href="@($"/proje/{ProjeId}")"><Icon Name="arrow-left" /> @proje.Ad</a></p>
     <h1>Metraj Girişi</h1>
     <p>Poz kodu, adı veya kısaltmasını (örn. "beton pompa") yazabilirsin — sistem eşleşen pozu bulur.</p>
 
@@ -24,11 +24,11 @@ else
         var bulunanPoz = Veri.PozAra(pozAramaMetni);
         @if (bulunanPoz != null)
         {
-            <p class="basarili-mesaj">✓ Eşleşti: <strong>@bulunanPoz.PozKodu</strong> — @bulunanPoz.Ad (@bulunanPoz.Birim, birim maliyet: @bulunanPoz.BirimMaliyet().ToString("N2") TL)</p>
+            <p class="basarili-mesaj"><Icon Name="check" /> Eşleşti: <strong>@bulunanPoz.PozKodu</strong> — @bulunanPoz.Ad (@bulunanPoz.Birim, birim maliyet: @bulunanPoz.BirimMaliyet().ToString("N2") TL)</p>
         }
         else
         {
-            <p class="hata-mesaj">✗ Eşleşme bulunamadı. Poz kütüphanesindeki kodları veya kısaltmaları kontrol et.</p>
+            <p class="hata-mesaj"><Icon Name="x" /> Eşleşme bulunamadı. Poz kütüphanesindeki kodları veya kısaltmaları kontrol et.</p>
         }
     }
 
@@ -42,7 +42,7 @@ else
         <input @bind="miktarMetni" placeholder="örn: 28.8" />
     </div>
 
-    <button @onclick="KalemEkle">Metraj Kalemi Ekle</button>
+    <button @onclick="KalemEkle"><Icon Name="plus" /> Metraj Kalemi Ekle</button>
 
     @if (!string.IsNullOrEmpty(sonMesaj))
     {

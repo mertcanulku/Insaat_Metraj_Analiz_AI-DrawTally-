@@ -10,18 +10,21 @@
 }
 else
 {
-    <p><a href="/">← Proje listesi</a></p>
+    <p><a href="/"><Icon Name="arrow-left" /> Proje listesi</a></p>
     <h1>@proje.Ad</h1>
 
     <div class="proje-aksiyonlar">
-        <a href="@($"proje/{ProjeId}/metraj-giris")">+ Metraj Girişi</a>
-        <a href="@($"proje/{ProjeId}/proje-import")">+ Import (CSV/PDF/DWG/DXF)</a>
+        <a href="@($"proje/{ProjeId}/metraj-giris")"><Icon Name="plus" /> Metraj Girişi</a>
+        <a href="@($"proje/{ProjeId}/proje-import")"><Icon Name="plus" /> Import (CSV/PDF/DWG/DXF)</a>
     </div>
 
     <h3>Keşif Özeti</h3>
     @if (proje.MetrajKalemleri.Count == 0)
     {
-        <p><em>Bu projede henüz metraj kalemi yok. Yukarıdaki seçeneklerden biriyle ekleyebilirsin.</em></p>
+        <div class="bos-durum">
+            <strong>Bu projede henüz metraj kalemi yok</strong>
+            <span>Yukarıdaki seçeneklerden biriyle ekleyebilirsin.</span>
+        </div>
     }
     else
     {
@@ -37,6 +40,7 @@ else
             }
         </div>
 
+        <div class="veri-tablo-wrap">
         <table class="veri-tablo">
             <thead>
                 <tr>
@@ -61,7 +65,7 @@ else
                         <td>@k.Miktar.ToString("0.000")</td>
                         <td>@k.Poz.BirimMaliyet().ToString("N2")</td>
                         <td>@k.ToplamMaliyet().ToString("N2")</td>
-                        <td><button @onclick="() => KalemSil(k.Id)">Sil</button></td>
+                        <td><button class="btn-danger" @onclick="() => KalemSil(k.Id)"><Icon Name="trash" /> Sil</button></td>
                     </tr>
                 }
             </tbody>
@@ -81,6 +85,7 @@ else
                 </tr>
             </tfoot>
         </table>
+        </div>
     }
 }
 

@@ -10,7 +10,7 @@
        placeholder="Poz kodu veya adında ara..."
        value="@aramaMetni" @oninput="AramaDegisti" />
 
-<p class="hata-mesaj" style="color:var(--ink-soft)">
+<p class="yardim-metni">
     @if (aramaMetni.Trim().Length == 0)
     {
         <text>@Gosterilecek.Count / @Veri.Pozlar.Count kayıt gösteriliyor — daraltmak için arama kutusunu kullanın.</text>
@@ -21,27 +21,39 @@
     }
 </p>
 
-<table class="veri-tablo">
-    <thead>
-        <tr>
-            <th>Poz Kodu</th>
-            <th>Ad</th>
-            <th>Birim</th>
-            <th>Birim Maliyet</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var p in Gosterilecek)
-        {
-            <tr>
-                <td>@p.PozKodu</td>
-                <td>@p.Ad</td>
-                <td>@p.Birim</td>
-                <td>@p.BirimMaliyet().ToString("N2")</td>
-            </tr>
-        }
-    </tbody>
-</table>
+@if (Gosterilecek.Count == 0)
+{
+    <div class="bos-durum">
+        <strong>Eşleşme bulunamadı</strong>
+        <span>Farklı bir poz kodu veya anahtar kelime deneyin.</span>
+    </div>
+}
+else
+{
+    <div class="veri-tablo-wrap">
+        <table class="veri-tablo">
+            <thead>
+                <tr>
+                    <th>Poz Kodu</th>
+                    <th>Ad</th>
+                    <th>Birim</th>
+                    <th>Birim Maliyet</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Gosterilecek)
+                {
+                    <tr>
+                        <td>@p.PozKodu</td>
+                        <td>@p.Ad</td>
+                        <td>@p.Birim</td>
+                        <td>@p.BirimMaliyet().ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
 
 @code {
     private const int GosterimLimiti = 300;

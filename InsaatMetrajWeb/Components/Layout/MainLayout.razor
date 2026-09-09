@@ -3,17 +3,21 @@
 <div class="app-shell">
     <nav class="sidebar">
         <div class="brand">
-            <img src="images/brand/drawtally-logo-horizontal.svg" alt="Logo" class="brand-logo" />
+            <img src="images/brand/drawtally-icon-only.svg" alt="" class="brand-mark" />
+            <div class="brand-text">
+                <span class="brand-name">DrawTally</span>
+                <span class="brand-sub">by Drongos Global</span>
+            </div>
         </div>
         <div class="nav-links">
-            <NavLink href="" Match="NavLinkMatch.All">Projeler</NavLink>
-            <NavLink href="poz-kutuphanesi">Poz Kütüphanesi</NavLink>
+            <NavLink href="" Match="NavLinkMatch.All"><Icon Name="folder" /> Projeler</NavLink>
+            <NavLink href="poz-kutuphanesi"><Icon Name="library" /> Poz Kütüphanesi</NavLink>
         </div>
         <AuthorizeView>
             <Authorized>
                 <div class="sidebar-user">
                     <span class="kullanici-email">@context.User.Identity?.Name</span>
-                    <a href="account/cikis" class="cikis-linki">Çıkış Yap</a>
+                    <a href="account/cikis" class="cikis-linki"><Icon Name="sign-out" /> Çıkış Yap</a>
                 </div>
             </Authorized>
         </AuthorizeView>
