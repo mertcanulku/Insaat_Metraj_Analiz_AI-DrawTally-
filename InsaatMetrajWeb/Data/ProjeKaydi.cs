@@ -1,3 +1,5 @@
+using InsaatMetrajWeb.Models;
+
 namespace InsaatMetrajWeb.Data;
 
 /// <summary>Bir projenin veritabanı kaydı. Sahibi (SahipId) dışındaki kullanıcılar bu projeyi göremez.</summary>
@@ -22,4 +24,8 @@ public class MetrajKalemiKaydi
     public int PozId { get; set; }
     public string OlcumDetayi { get; set; } = "";
     public decimal Miktar { get; set; }
+
+    /// <summary>Kalemin ait olduğu mühendislik disiplini — çizim analizinden (DisiplinTespitServisi)
+    /// veya CSV/PDF import sırasında kullanıcının seçtiği disiplinden gelir; bilinmiyorsa Bilinmiyor.</summary>
+    public ProjeDisiplini Disiplin { get; set; } = ProjeDisiplini.Bilinmiyor;
 }

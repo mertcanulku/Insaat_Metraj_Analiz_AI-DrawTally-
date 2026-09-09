@@ -8,7 +8,10 @@ public enum KaynakTuru
     /// <summary>DWG'deki kapalı bir poligondan shoelace formülüyle hesaplandı (deterministik).</summary>
     VektorGeometri,
     /// <summary>Metin katmanı yoktu veya yetersizdi — sayfa/bölge görsel olarak yapay zekaya gönderildi.</summary>
-    AIGorsel
+    AIGorsel,
+    /// <summary>DWG'deki Insert (blok referansı) nesnelerinin katman+blok bazında sayılmasıyla elde edildi
+    /// (deterministik) — kolon/kiriş, priz/anahtar gibi alan değil adet ile ifade edilen elemanlar için.</summary>
+    BlokSayimi
 }
 
 /// <summary>Bir satırın ne kadar güvenilir olduğuna dair kabaca üç seviyeli özet.</summary>
@@ -44,6 +47,19 @@ public class CizimAnalizSonucu
     public KaynakTuru KaynakTuru { get; set; }
     public GuvenSkoru GuvenSkoru { get; set; }
     public bool OnaylandiMi { get; set; }
+
+    /// <summary>Bu satırın üretildiği yüklenen dosyanın adı — aynı projeye art arda birden fazla
+    /// çizim/PDF yüklendiğinde sonuçlar birikir (üzerine yazılmaz), bu alan hangi satırın hangi
+    /// dosyadan geldiğini ayırt etmek için kullanılır.</summary>
+    public string KaynakDosya { get; set; } = "";
+
+    /// <summary>Blok (Insert) referansı sayımından gelen satırlar için adet — kolon/kiriş, priz/anahtar
+    /// gibi alan değil adet ile ifade edilen elemanlarda dolu, aksi halde null.</summary>
+    public int? Adet { get; set; }
+
+    /// <summary>Çizgi (Line) / açık polyline segmentlerinin katman bazında toplam uzunluğu (metre) —
+    /// elektrik hat/kablo gibi uzunluk ile ifade edilen elemanlarda dolu, aksi halde null.</summary>
+    public decimal? Uzunluk { get; set; }
 
     /// <summary>Çizimin ait olduğu disiplin (tespit edilebildiyse) — AI'ya bağlam olarak
     /// verilir ve UI'da Kesin/Belirsiz sekmelerinde etiket olarak gösterilir.</summary>
