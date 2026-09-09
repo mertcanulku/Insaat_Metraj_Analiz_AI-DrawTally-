@@ -418,6 +418,19 @@ else
             StateHasChanged();
         });
         var ilgiliSonuclar = await CizimAnalizServisi.DwgPozOnerileriniEkleAsync(yeniSonuclar, e.File.Name, ilerleme);
+
+        // yeniSonuclar geometrik olarak aday buldu (yukarıdaki Count==0 kontrolünü geçti) ama AI
+        // hiçbirinin gerçek bir yapı elemanı olmadığına karar vermiş olabilir (ör. bu dosya bir
+        // pafta/lejant/detay sayfasıysa — LOGO, İNDEKS, "... DETAYI" gibi bloklar). Bu durumda
+        // odaSonuclari'na hiçbir şey eklenmeyip kullanıcıya hiçbir geri bildirim verilmemesi,
+        // "yükleme hiç işlenmemiş gibi" görünmesine yol açıyordu.
+        if (ilgiliSonuclar.Count == 0)
+        {
+            genelHataMesaji = $"Çizimde {yeniSonuclar.Count} geometrik aday (blok/poligon) bulundu, ancak yapay zeka bunların hiçbirinin gerçek bir oda/yapı elemanı olmadığına karar verdi " +
+                "(ör. pafta çerçevesi, lejant, kuzey oku veya detay/başlık bloğu gibi çizim süsleri). " +
+                "Bu dosya bir plan/kat çizimi değil bir detay/pafta sayfası olabilir.";
+        }
+
         odaSonuclari.AddRange(ilgiliSonuclar);
     }
 
