@@ -4,8 +4,12 @@ namespace InsaatMetrajWeb.Services;
 
 /// <summary>
 /// AI sağlayıcı HTTP çağrılarında (NVIDIA NIM, Anthropic) tekrar eden 429 (Too Many Requests) /
-/// 503 (Service Unavailable) hatalarını ve geçici zaman aşımlarını üstel geri çekilme (exponential
-/// backoff) ile otomatik yeniden deneyen ortak yardımcı.
+/// 500 (Internal Server Error) / 502 (Bad Gateway) / 503 (Service Unavailable) / 504 (Gateway
+/// Timeout) hatalarını ve geçici zaman aşımlarını üstel geri çekilme (exponential backoff) ile
+/// otomatik yeniden deneyen ortak yardımcı. 500 de dahil edildi çünkü barındırılan model
+/// sağlayıcılarında (ör. NVIDIA NIM) bu genelde model instance'ının anlık aşırı yüklenmesi/yeniden
+/// başlaması gibi geçici bir durumdur — istemci tarafında tekrarlanabilir/kalıcı bir istek hatası
+/// değildir.
 ///
 /// Neden gerekli: DWG poz önerisi akışı (CizimAnalizServisi.DwgPozOnerileriniEkleAsync) tek bir
 /// dosya için onlarca satırı sınırlı paralellikle (AiEsZamanliIstekLimiti) ama yine de aynı anda
@@ -18,8 +22,9 @@ internal static class AiHttpRetryYardimcisi
     private const int MaksimumDeneme = 5;
 
     /// <summary><paramref name="istekOlustur"/> her denemede YENİ bir HttpRequestMessage üretmeli
-    /// (bir HttpRequestMessage/içeriği yalnızca bir kez gönderilebilir). 429/503 yanıtlarında ve
-    /// istek zaman aşımlarında (TaskCanceledException) sağlayıcının "Retry-After" başlığı varsa ona,
+    /// (bir HttpRequestMessage/içeriği yalnızca bir kez gönderilebilir). 429/500/502/503/504
+    /// yanıtlarında ve istek zaman aşımlarında (TaskCanceledException) sağlayıcının "Retry-After"
+    /// başlığı varsa ona,
     /// yoksa üstel geri çekilmeye (+ jitter) göre bekleyip tekrar dener. Son denemede de geçici hata
     /// alınırsa o yanıt/istisna olduğu gibi çağırana döner/fırlatılır — nihai hata yorumlaması
     /// (ör. "API 429 döndü" mesajı) çağıran tarafın sorumluluğunda kalır.</summary>
@@ -42,7 +47,9 @@ internal static class AiHttpRetryYardimcisi
                 continue;
             }
 
-            bool geciciHata = cevap.StatusCode == HttpStatusCode.TooManyRequests || (int)cevap.StatusCode == 503;
+            var durumKodu = (int)cevap.StatusCode;
+            bool geciciHata = cevap.StatusCode == HttpStatusCode.TooManyRequests
+                || durumKodu is 500 or 502 or 503 or 504;
             if (geciciHata && deneme < MaksimumDeneme)
             {
                 var bekleme = GeriCekilmeSuresi(deneme, cevap.Headers.RetryAfter);
