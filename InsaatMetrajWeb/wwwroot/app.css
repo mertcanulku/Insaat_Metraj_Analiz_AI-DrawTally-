@@ -146,6 +146,10 @@ body {
     color: var(--ink);
     font-size: 15px;
     line-height: 1.55;
+    /* Dar ekranlarda kenar çubuğu nav-links'i sarmadığı için sayfa yatayda taşabiliyor;
+       bu, position:fixed öğelerin (ör. sağ üstteki kullanıcı menüsü) tarayıcının genişlemiş
+       layout viewport'una göre konumlanıp ekran dışına kaymasına yol açıyordu. */
+    overflow-x: hidden;
 }
 
 a { color: var(--brand); }
@@ -228,10 +232,19 @@ a { color: var(--brand); }
     .brand { margin-bottom: 0; }
     .brand-mark { width: 32px; height: 32px; }
     .brand-sub { display: none; }
-    .nav-links { flex-direction: row; flex: 1; gap: 4px; }
-    .nav-links a { padding: 8px 10px; box-shadow: none !important; }
+    .nav-links {
+        flex-direction: row;
+        flex: 1;
+        gap: 4px;
+        min-width: 0;
+        overflow-x: auto;
+        /* Dar ekranlarda içerik sığmazsa taşma burada, kendi içinde kalsın — sayfanın tamamını
+           yatayda genişletmesin. */
+    }
+    .nav-links a { padding: 8px 10px; box-shadow: none !important; white-space: nowrap; }
     .nav-links a.active { box-shadow: inset 0 -3px 0 var(--brand) !important; }
-    .sidebar-user, .sidebar-foot { display: none; }
+    .sidebar-foot { display: none; }
+    .kullanici-menu-email { display: none; }
     .content { padding: 22px 18px; }
     .sheet { padding: 24px 20px; }
 }
@@ -713,39 +726,76 @@ ul li { margin-bottom: 6px; }
 .field-error { display: block; color: var(--warn); font-size: 0.8rem; margin-top: 4px; }
 .validation-message { display: block; color: var(--warn); font-size: 0.8rem; margin-top: 4px; }
 
-/* --- Kenar çubuğu kullanıcı bölümü --- */
-.sidebar-user {
-    border-top: 1px solid var(--line-soft);
-    margin-top: 14px;
-    padding-top: 14px;
-    font-size: 0.82rem;
-    color: var(--ink-soft);
-}
-.sidebar-user .kullanici-email {
-    display: block;
-    margin-bottom: 8px;
-    word-break: break-all;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.75rem;
-    color: var(--ink-faint);
-}
-.sidebar-user .cikis-linki {
+/* --- İçerik alanının üstündeki, sayfa akışına dahil kullanıcı menüsü satırı ---
+   Daha önce position:fixed ile sağ üste sabitlenmişti; bu hem sheet içeriğinin üst kısmıyla
+   (ör. üyelik deneme banner'ındaki "Planları gör" linkiyle) çakışıyordu hem de dar ekranlarda
+   kenar çubuğu taştığında layout viewport genişleyip menüyü ekran dışına itiyordu. Artık normal
+   akışta, sheet'in hemen üstünde sağa yaslı duruyor. */
+.content-topbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+.kullanici-menu { position: relative; }
+.kullanici-menu-tetikleyici {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 100%;
-    background: transparent;
-    color: var(--ink-soft);
-    border: 1px solid var(--line);
+    gap: 8px;
+    max-width: 220px;
+    background: var(--sheet);
+    border: 1px solid var(--line-soft);
     border-radius: var(--radius-sm);
-    padding: 7px 10px;
-    font-size: 0.8rem;
-    text-decoration: none;
-    box-sizing: border-box;
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    box-shadow: var(--shadow-card);
+    padding: 8px 14px;
+    color: var(--ink-soft);
+    cursor: pointer;
 }
-.sidebar-user .cikis-linki:hover { background: var(--surface-2); color: var(--ink); border-color: var(--brand); }
+.kullanici-menu-tetikleyici .icon { flex-shrink: 0; color: var(--accent); }
+.kullanici-menu-email {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.kullanici-menu-acilir {
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    position: absolute;
+    /* top:100% (boşluksuz) — tetikleyici ile menü arasında fareyi hover dışına düşürecek boş bir
+       alan bırakmamak için; görsel ayrım için boşluk yerine üstte padding kullanılıyor. */
+    top: 100%;
+    right: 0;
+    min-width: 200px;
+    background: var(--sheet);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-card);
+    padding: 6px;
+    margin-top: 6px;
+}
+.kullanici-menu::after {
+    /* Tetikleyici ile menü arasındaki 6px'lik boşluğu fare için "köprüler" — bu görünmez şerit
+       olmadan fare o boşluğa girdiği an hover durumu kırılıp menü kapanıyordu. */
+    content: "";
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: 6px;
+}
+/* Not: :focus-within kasıtlı olarak kullanılmıyor — Blazor'un enhanced navigation'ı, menüdeki
+   bir linke tıklanıp sayfa değiştikten sonra da o linkin browser focus'unu koruyor, bu da menünün
+   fare oradan çekildikten sonra bile "yapışık" açık kalmasına yol açıyordu. */
+.kullanici-menu:hover .kullanici-menu-acilir { display: flex; }
+.kullanici-menu-acilir a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 0.85rem;
+}
+.kullanici-menu-acilir a:hover { background: var(--surface-2); }
 
 /* ==========================================================================
    PozSecici — 14binin üzerinde poz içeren kütüphanede aranabilir seçim kutusu

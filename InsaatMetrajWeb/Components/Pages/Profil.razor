@@ -1,0 +1,343 @@
+@page "/profil"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthProvider
+@inject IdentityRedirectManager RedirectManager
+
+<h1>Profil</h1>
+
+<div class="account-card account-card-wide">
+    <h3>Üyelik Planı</h3>
+    <p>
+        Şu an <strong>@UyelikServisi.PlanAdi(kullanici?.EtkinPlan ?? UyelikPlani.Starter)</strong> planındasın.
+        @if (denemeGunKaldi.HasValue)
+        {
+            <span> Ücretsiz Pro deneme sürenden <strong>@denemeGunKaldi gün</strong> kaldı.</span>
+        }
+    </p>
+
+    @if (!string.IsNullOrEmpty(planMesaji))
+    {
+        <div class="uyelik-banner"><Icon Name="check" /> @planMesaji</div>
+    }
+
+    <div class="uyelik-plan-grid">
+        @foreach (var plan in planlar)
+        {
+            var buPlanEtkin = kullanici?.EtkinPlan == plan.Tur;
+            <div class="uyelik-plan-kart @(buPlanEtkin ? "uyelik-plan-kart-aktif" : "")">
+                @if (buPlanEtkin)
+                {
+                    <span class="uyelik-plan-etiket">Şu anki plan</span>
+                }
+                <div class="uyelik-plan-baslik"><Icon Name="star" /> @plan.Ad</div>
+                <div class="uyelik-plan-fiyat">@plan.FiyatMetni</div>
+                <ul class="uyelik-plan-ozellikler">
+                    @foreach (var ozellik in plan.Ozellikler)
+                    {
+                        <li><Icon Name="check" /> @ozellik</li>
+                    }
+                </ul>
+                @if (buPlanEtkin)
+                {
+                    <button class="btn-secondary" disabled>Kullanıyorsun</button>
+                }
+                else
+                {
+                    <button class="btn-primary" @onclick="() => PlanSec(plan.Tur)">@(plan.Tur > (kullanici?.Plan ?? UyelikPlani.Starter) ? "Yükselt" : "Bu plana geç")</button>
+                }
+            </div>
+        }
+    </div>
+
+    <p class="uyelik-not">
+        <Icon Name="shield" /> Ödeme entegrasyonu henüz eklenmedi — plan değişimi şimdilik buradan anında ve ücretsiz uygulanır.
+    </p>
+</div>
+
+<div class="account-card account-card-wide">
+    <h3>Hesap Bilgileri</h3>
+    <p class="uyelik-not"><Icon Name="shield" /> E-posta: <strong>@kullanici?.Email</strong></p>
+
+    @if (!string.IsNullOrEmpty(profilMesaji))
+    {
+        <div class="uyelik-banner"><Icon Name="check" /> @profilMesaji</div>
+    }
+
+    <EditForm Model="ProfilInput" OnValidSubmit="ProfilGuncelle">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="account-error" role="alert" />
+
+        <div class="form-check">
+            <label>
+                <InputCheckbox @bind-Value="ProfilInput.KurumsalHesap" id="kurumsalHesap" />
+                Şirket adına kayıtlıyım
+            </label>
+        </div>
+
+        <div class="kosullu-alan kurumsal-alan">
+            <div class="form-group">
+                <label for="firmaAdi">Firma Adı</label>
+                <InputText @bind-Value="ProfilInput.FirmaAdi" id="firmaAdi" class="form-control" placeholder="örn: ABC İnşaat Ltd. Şti." />
+                <ValidationMessage For="() => ProfilInput.FirmaAdi" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="firmaTelefonu">Firma Telefonu</label>
+                <InputText @bind-Value="ProfilInput.FirmaTelefonu" id="firmaTelefonu" class="form-control" placeholder="0212 000 00 00" />
+            </div>
+            <div class="form-group">
+                <label for="yetkiliAdSoyad">Yetkili Adı Soyadı</label>
+                <InputText @bind-Value="ProfilInput.YetkiliAdSoyad" id="yetkiliAdSoyad" class="form-control" placeholder="ad soyad" />
+                <ValidationMessage For="() => ProfilInput.YetkiliAdSoyad" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="yetkiliEmail">Yetkili E-postası</label>
+                <InputText @bind-Value="ProfilInput.YetkiliEmail" id="yetkiliEmail" class="form-control" placeholder="yetkili@firma.com" />
+                <ValidationMessage For="() => ProfilInput.YetkiliEmail" class="field-error" />
+            </div>
+        </div>
+
+        <div class="form-check">
+            <label>
+                <InputCheckbox @bind-Value="ProfilInput.FaturaBilgisiIstiyor" id="faturaBilgisi" />
+                Fatura bilgilerimi tut
+            </label>
+        </div>
+
+        <div class="kosullu-alan fatura-alan">
+            <div class="form-group">
+                <label for="vergiDairesi">Vergi Dairesi</label>
+                <InputText @bind-Value="ProfilInput.VergiDairesi" id="vergiDairesi" class="form-control" />
+                <ValidationMessage For="() => ProfilInput.VergiDairesi" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="vergiKimlikNo">Vergi Kimlik No / TC Kimlik No</label>
+                <InputText @bind-Value="ProfilInput.VergiKimlikNo" id="vergiKimlikNo" class="form-control" placeholder="10 (VKN) veya 11 (TCKN) haneli" />
+                <ValidationMessage For="() => ProfilInput.VergiKimlikNo" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="faturaAdresi">Fatura Adresi</label>
+                <InputTextArea @bind-Value="ProfilInput.FaturaAdresi" id="faturaAdresi" class="form-control" rows="2" />
+                <ValidationMessage For="() => ProfilInput.FaturaAdresi" class="field-error" />
+            </div>
+        </div>
+
+        <button type="submit" class="btn-primary">Bilgileri Kaydet</button>
+    </EditForm>
+</div>
+
+<div class="account-card account-card-wide">
+    <h3>Şifre Değiştir</h3>
+    <p class="uyelik-not"><Icon Name="shield" /> Şifreni değiştirdikten sonra güvenlik nedeniyle tekrar giriş yapman istenecek.</p>
+
+    @if (!string.IsNullOrEmpty(sifreHatasi))
+    {
+        <div class="account-error" role="alert">@sifreHatasi</div>
+    }
+
+    <EditForm Model="SifreInput" OnValidSubmit="SifreDegistir">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="account-error" role="alert" />
+
+        <div class="form-group">
+            <label for="mevcutSifre">Mevcut Şifre</label>
+            <InputText type="password" @bind-Value="SifreInput.MevcutSifre" id="mevcutSifre" class="form-control" autocomplete="current-password" />
+            <ValidationMessage For="() => SifreInput.MevcutSifre" class="field-error" />
+        </div>
+        <div class="form-group">
+            <label for="yeniSifre">Yeni Şifre</label>
+            <InputText type="password" @bind-Value="SifreInput.YeniSifre" id="yeniSifre" class="form-control" autocomplete="new-password" placeholder="en az 6 karakter" />
+            <ValidationMessage For="() => SifreInput.YeniSifre" class="field-error" />
+        </div>
+        <div class="form-group">
+            <label for="yeniSifreTekrar">Yeni Şifre (tekrar)</label>
+            <InputText type="password" @bind-Value="SifreInput.YeniSifreTekrar" id="yeniSifreTekrar" class="form-control" autocomplete="new-password" placeholder="şifreyi tekrar yazın" />
+            <ValidationMessage For="() => SifreInput.YeniSifreTekrar" class="field-error" />
+        </div>
+
+        <button type="submit" class="btn-primary">Şifreyi Güncelle</button>
+    </EditForm>
+</div>
+
+@code {
+    private ApplicationUser? kullanici;
+    private string? profilMesaji;
+    private string? planMesaji;
+    private string? sifreHatasi;
+    private int? denemeGunKaldi;
+
+    private ProfilInputModel ProfilInput { get; set; } = new();
+    private SifreInputModel SifreInput { get; set; } = new();
+
+    private sealed record PlanBilgisi(UyelikPlani Tur, string Ad, string FiyatMetni, string[] Ozellikler);
+
+    private readonly List<PlanBilgisi> planlar = new()
+    {
+        new(UyelikPlani.Starter, "Starter", "Ücretsiz", new[]
+        {
+            $"En fazla {UyelikServisi.ProjeSiniri(UyelikPlani.Starter)} proje",
+            "Poz kütüphanesine tam erişim",
+            "CSV/PDF çizim import",
+        }),
+        new(UyelikPlani.Pro, "Pro", "Aylık abonelik", new[]
+        {
+            $"En fazla {UyelikServisi.ProjeSiniri(UyelikPlani.Pro)} proje",
+            "Excel/PDF keşif özeti dışa aktarımı",
+            "Poz kütüphanesine tam erişim",
+            "CSV/PDF çizim import",
+        }),
+        new(UyelikPlani.Business, "Business", "Aylık abonelik", new[]
+        {
+            "Sınırsız proje",
+            "Excel/PDF keşif özeti dışa aktarımı",
+            "Poz kütüphanesine tam erişim",
+            "CSV/PDF çizim import",
+        }),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var sahipId = await AuthProvider.GetUserIdAsync();
+        kullanici = await UserManager.FindByIdAsync(sahipId);
+
+        if (kullanici != null)
+        {
+            ProfilInput = new ProfilInputModel
+            {
+                KurumsalHesap = kullanici.KurumsalHesap,
+                FirmaAdi = kullanici.FirmaAdi,
+                FirmaTelefonu = kullanici.FirmaTelefonu,
+                YetkiliAdSoyad = kullanici.YetkiliAdSoyad,
+                YetkiliEmail = kullanici.YetkiliEmail,
+                FaturaBilgisiIstiyor = kullanici.FaturaBilgisiIstiyor,
+                VergiDairesi = kullanici.VergiDairesi,
+                VergiKimlikNo = kullanici.VergiKimlikNo,
+                FaturaAdresi = kullanici.FaturaAdresi,
+            };
+        }
+
+        GuncelleDenemeSuresi();
+    }
+
+    private void GuncelleDenemeSuresi()
+    {
+        denemeGunKaldi = kullanici?.DenemeBitisTarihi is { } bitis && bitis > DateTime.UtcNow
+            ? (int)Math.Ceiling((bitis - DateTime.UtcNow).TotalDays)
+            : null;
+    }
+
+    private async Task PlanSec(UyelikPlani plan)
+    {
+        if (kullanici == null) return;
+
+        kullanici.Plan = plan;
+        // Kullanıcı bilinçli olarak bir plan seçtiğinde deneme süresi anlamını kaybeder.
+        kullanici.DenemeBitisTarihi = null;
+        await UserManager.UpdateAsync(kullanici);
+
+        GuncelleDenemeSuresi();
+        planMesaji = $"Planın {UyelikServisi.PlanAdi(plan)} olarak güncellendi.";
+    }
+
+    private async Task ProfilGuncelle()
+    {
+        if (kullanici == null) return;
+
+        kullanici.KurumsalHesap = ProfilInput.KurumsalHesap;
+        kullanici.FirmaAdi = ProfilInput.KurumsalHesap ? ProfilInput.FirmaAdi : null;
+        kullanici.FirmaTelefonu = ProfilInput.KurumsalHesap ? ProfilInput.FirmaTelefonu : null;
+        kullanici.YetkiliAdSoyad = ProfilInput.KurumsalHesap ? ProfilInput.YetkiliAdSoyad : null;
+        kullanici.YetkiliEmail = ProfilInput.KurumsalHesap ? ProfilInput.YetkiliEmail : null;
+        kullanici.FaturaBilgisiIstiyor = ProfilInput.FaturaBilgisiIstiyor;
+        kullanici.VergiDairesi = ProfilInput.FaturaBilgisiIstiyor ? ProfilInput.VergiDairesi : null;
+        kullanici.VergiKimlikNo = ProfilInput.FaturaBilgisiIstiyor ? ProfilInput.VergiKimlikNo : null;
+        kullanici.FaturaAdresi = ProfilInput.FaturaBilgisiIstiyor ? ProfilInput.FaturaAdresi : null;
+
+        var result = await UserManager.UpdateAsync(kullanici);
+        profilMesaji = result.Succeeded
+            ? "Hesap bilgilerin güncellendi."
+            : string.Join(" ", result.Errors.Select(e => e.Description));
+    }
+
+    private async Task SifreDegistir()
+    {
+        if (kullanici == null) return;
+
+        var result = await UserManager.ChangePasswordAsync(kullanici, SifreInput.MevcutSifre, SifreInput.YeniSifre);
+
+        if (result.Succeeded)
+        {
+            // Şifre değişince güvenlik damgası (security stamp) da değişir. Bu interaktif devre
+            // içinden oturum çerezini yenilemenin bir yolu yok (HTTP cevabı zaten gönderilmiş
+            // durumda — SignInManager.RefreshSignInAsync burada "Headers are read-only" hatasıyla
+            // devreyi çökertir). Bunun yerine kullanıcıyı gerçek bir HTTP isteğiyle çalışan
+            // Logout sayfasına yönlendiriyoruz; o da çıkışı yapıp giriş ekranına gönderiyor.
+            var girisYolu = "account/giris?sifreGuncellendi=true";
+            RedirectManager.RedirectTo("account/cikis", new Dictionary<string, object?> { ["ReturnUrl"] = girisYolu });
+        }
+        else
+        {
+            sifreHatasi = string.Join(" ", result.Errors.Select(e => e.Description));
+        }
+    }
+
+    private sealed class ProfilInputModel : IValidatableObject
+    {
+        public bool KurumsalHesap { get; set; }
+        public string? FirmaAdi { get; set; }
+        public string? FirmaTelefonu { get; set; }
+        public string? YetkiliAdSoyad { get; set; }
+        public string? YetkiliEmail { get; set; }
+
+        public bool FaturaBilgisiIstiyor { get; set; }
+        public string? VergiDairesi { get; set; }
+        public string? VergiKimlikNo { get; set; }
+        public string? FaturaAdresi { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (KurumsalHesap)
+            {
+                if (string.IsNullOrWhiteSpace(FirmaAdi))
+                    yield return new ValidationResult("Firma adı gerekli.", new[] { nameof(FirmaAdi) });
+                if (string.IsNullOrWhiteSpace(YetkiliAdSoyad))
+                    yield return new ValidationResult("Yetkili adı soyadı gerekli.", new[] { nameof(YetkiliAdSoyad) });
+                if (string.IsNullOrWhiteSpace(YetkiliEmail))
+                    yield return new ValidationResult("Yetkili e-postası gerekli.", new[] { nameof(YetkiliEmail) });
+                else if (!new EmailAddressAttribute().IsValid(YetkiliEmail))
+                    yield return new ValidationResult("Geçerli bir yetkili e-postası girin.", new[] { nameof(YetkiliEmail) });
+            }
+
+            if (FaturaBilgisiIstiyor)
+            {
+                if (string.IsNullOrWhiteSpace(VergiDairesi))
+                    yield return new ValidationResult("Vergi dairesi gerekli.", new[] { nameof(VergiDairesi) });
+
+                if (string.IsNullOrWhiteSpace(VergiKimlikNo))
+                    yield return new ValidationResult("Vergi kimlik no gerekli.", new[] { nameof(VergiKimlikNo) });
+                else if (VergiKimlikNo.Length is not (10 or 11) || !VergiKimlikNo.All(char.IsDigit))
+                    yield return new ValidationResult("Vergi kimlik no 10 haneli (VKN) veya 11 haneli (TCKN) rakamlardan oluşmalı.", new[] { nameof(VergiKimlikNo) });
+
+                if (string.IsNullOrWhiteSpace(FaturaAdresi))
+                    yield return new ValidationResult("Fatura adresi gerekli.", new[] { nameof(FaturaAdresi) });
+            }
+        }
+    }
+
+    private sealed class SifreInputModel
+    {
+        [Required(ErrorMessage = "Mevcut şifre gerekli.")]
+        public string MevcutSifre { get; set; } = "";
+
+        [Required(ErrorMessage = "Yeni şifre gerekli.")]
+        [StringLength(100, ErrorMessage = "{0} en az {2} karakter olmalı.", MinimumLength = 6)]
+        public string YeniSifre { get; set; } = "";
+
+        [Required(ErrorMessage = "Yeni şifre tekrarı gerekli.")]
+        [Compare(nameof(YeniSifre), ErrorMessage = "Şifreler eşleşmiyor.")]
+        public string YeniSifreTekrar { get; set; } = "";
+    }
+}

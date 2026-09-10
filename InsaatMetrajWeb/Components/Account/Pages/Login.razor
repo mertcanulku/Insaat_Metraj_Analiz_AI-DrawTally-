@@ -20,6 +20,11 @@
 <div class="account-card">
     <h1>Giriş Yap</h1>
 
+    @if (SifreGuncellendi)
+    {
+        <div class="uyelik-banner"><Icon Name="check" /> Şifren güncellendi. Yeni şifrenle giriş yapabilirsin.</div>
+    }
+
     <StatusMessage Message="@errorMessage" />
 
     <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
@@ -73,6 +78,9 @@
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    private bool SifreGuncellendi { get; set; }
 
     private bool GoogleGirisAktif => !string.IsNullOrWhiteSpace(Configuration["Google:ClientId"]);
 

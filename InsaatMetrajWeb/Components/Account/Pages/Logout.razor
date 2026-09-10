@@ -13,9 +13,17 @@
 </div>
 
 @code {
+    // Şifre değiştirme gibi güvenlik damgasını (security stamp) değiştiren işlemlerden sonra,
+    // interaktif bir Blazor Server devresi içinden oturum çerezini güvenle yenilemenin yolu yok
+    // (o an HTTP cevabı zaten gönderilmiş oluyor) — bunun yerine kullanıcı buraya (statik, gerçek
+    // bir HTTP isteği ile çalışan bu sayfaya) yönlendirilip çıkış yaptırılır ve ReturnUrl ile
+    // istenen mesajla birlikte giriş ekranına gönderilir.
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         await SignInManager.SignOutAsync();
-        RedirectManager.RedirectTo("account/giris");
+        RedirectManager.RedirectTo(ReturnUrl ?? "account/giris");
     }
 }
