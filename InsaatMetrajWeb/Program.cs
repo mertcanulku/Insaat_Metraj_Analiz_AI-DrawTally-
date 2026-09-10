@@ -2,6 +2,7 @@ using System.Globalization;
 using InsaatMetrajWeb.Components;
 using InsaatMetrajWeb.Components.Account;
 using InsaatMetrajWeb.Data;
+using InsaatMetrajWeb.Models;
 using InsaatMetrajWeb.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
@@ -47,7 +48,7 @@ builder.Services.AddSingleton<PozKutuphanesi>();
 builder.Services.AddScoped<VeriDeposu>();
 
 // PDF/DWG çizim analizi (oda adı + alan çıkarımı): appsettings.json'daki "AiProvider"
-// ("Anthropic" | "Nvidia" | "Gemini") ayarına göre hangi AI sağlayıcısının kullanılacağını seçer.
+// ("Anthropic" | "Nvidia" | "Gemini" | "Groq") ayarına göre hangi AI sağlayıcısının kullanılacağını seçer.
 switch (builder.Configuration["AiProvider"])
 {
     case "Nvidia":
@@ -55,6 +56,9 @@ switch (builder.Configuration["AiProvider"])
         break;
     case "Gemini":
         builder.Services.AddHttpClient<IAiClassificationProvider, GeminiClassificationProvider>();
+        break;
+    case "Groq":
+        builder.Services.AddHttpClient<IAiClassificationProvider, GroqProvider>();
         break;
     default:
         builder.Services.AddHttpClient<IAiClassificationProvider, AnthropicClassificationProvider>();
@@ -119,6 +123,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
         options.Password.RequireNonAlphanumeric = false;
         options.Password.RequireUppercase = false;
     })
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
@@ -134,6 +139,11 @@ using (var scope = app.Services.CreateScope())
     // Data/PozSeed/*.json dosyalarından bir kez içe aktarır, ardından belleğe yükler.
     var pozKutuphanesi = scope.ServiceProvider.GetRequiredService<PozKutuphanesi>();
     await pozKutuphanesi.SeedVeYukleAsync(db, app.Environment.ContentRootPath);
+
+    // "Admin" rolü ilk açılışta bir kez oluşturulur (kalıcı altyapı — bkz. ApplicationUser/Roller).
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    if (!await roleManager.RoleExistsAsync("Admin"))
+        await roleManager.CreateAsync(new IdentityRole("Admin"));
 }
 
 if (!app.Environment.IsDevelopment())

@@ -640,7 +640,12 @@ public class CizimAnalizServisi
     // dakikaya çıkıyor ve UI'da tek bir sabit mesaj olduğundan kullanıcıya "takılı kaldı" gibi
     // görünüyor. Sınırlı paralellikle (aynı anda en fazla bu kadar istek) hem toplam süre kısalır
     // hem de her istek bittiğinde ilerlemeRaporu ile arayüz güncellenebilir.
-    private const int AiEsZamanliIstekLimiti = 4;
+    //
+    // NOT (2026-09-10): Groq gibi düşük tier'lı sağlayıcılarda dakika başı token limiti çok dar
+    // olabiliyor (bkz. AiHttpRetryYardimcisi) — 4'ü aynı anda göndermek bu limiti anında doldurup
+    // hepsinin birden 429 alması ve retry'ların senkronize çakışması ihtimalini artırıyordu.
+    // 2'ye düşürmek toplam token ihtiyacını azaltmaz ama isteklerin daha kademeli gitmesini sağlar.
+    private const int AiEsZamanliIstekLimiti = 2;
 
     /// <summary>Katman adı + geometrik sinyalleri (kapalılık, alan) AI hibrit sınıflandırmaya vererek her odaya bir poz önerisi ekler,
     /// ve AI'nın gerçek bir yapı elemanı olmadığına (çizim süsü — pafta çerçevesi, kuzey oku, ölçek çubuğu, revizyon bulutu,

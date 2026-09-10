@@ -19,7 +19,15 @@ namespace InsaatMetrajWeb.Services;
 /// </summary>
 internal static class AiHttpRetryYardimcisi
 {
-    private const int MaksimumDeneme = 5;
+    // NOT (2026-09-10): Groq'un düşük tier'larında bazı modeller için dakika başı token limiti
+    // (TPM) çok düşük olabiliyor (ör. 8000 token/dk) — canlı testte 25 eşzamanlı istekten 24'ü
+    // 429 döndü. Sağlayıcı her seferinde kısa bir "retry-after" (genelde birkaç saniye) veriyor,
+    // ama DWG akışı gibi onlarca satırlık bir dosyada bu darboğazı aşmak birkaç denemeden fazlasını
+    // gerektirebiliyor — eskiden 5 denemede pes ediliyordu ve dosyanın son birkaç satırı "API 429
+    // döndü" hatasına düşüp akışın "tıkanmış" gibi görünmesine yol açıyordu. Yeniden deneme sayısı
+    // artırıldı; sağlayıcının kendi retry-after süresine uyulduğu için (aşağıda) bu sadece toplam
+    // işlem süresini uzatır, gereksiz sıklıkta denemeye yol açmaz.
+    private const int MaksimumDeneme = 20;
 
     /// <summary><paramref name="istekOlustur"/> her denemede YENİ bir HttpRequestMessage üretmeli
     /// (bir HttpRequestMessage/içeriği yalnızca bir kez gönderilebilir). 429/500/502/503/504
@@ -75,9 +83,10 @@ internal static class AiHttpRetryYardimcisi
             }
         }
 
-        // Sağlayıcı Retry-After vermediyse üstel geri çekilme: ~1s, 2s, 4s, 8s (+ küçük jitter,
-        // aynı anda geri çekilen paralel isteklerin tekrar aynı anda çarpışmasını önlemek için).
-        var taban = Math.Pow(2, deneme - 1);
+        // Sağlayıcı Retry-After vermediyse üstel geri çekilme: ~1s, 2s, 4s, 8s... 30s'de tavan
+        // (MaksimumDeneme artık 20 olduğundan tavansız 2^19 saniyeye çıkardı) + küçük jitter,
+        // aynı anda geri çekilen paralel isteklerin tekrar aynı anda çarpışmasını önlemek için.
+        var taban = Math.Min(Math.Pow(2, deneme - 1), 30);
         var jitter = Random.Shared.NextDouble() * 0.5;
         return TimeSpan.FromSeconds(taban + jitter);
     }
