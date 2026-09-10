@@ -73,12 +73,26 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IEmailGonderici, SmtpEmailGonderici>();
 builder.Services.AddScoped<EmailDogrulamaServisi>();
 
-builder.Services.AddAuthentication(options =>
+var authBuilder = builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = IdentityConstants.ApplicationScheme;
+    options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+});
+authBuilder.AddIdentityCookies();
+
+// "Google ile devam et" — appsettings.json'daki Google:ClientId/ClientSecret boşsa (henüz
+// Google Cloud Console'da bir OAuth istemcisi oluşturulmadıysa) bu sağlayıcı hiç kaydedilmez;
+// Login/Register sayfalarındaki buton da bu durumda otomatik gizlenir (bkz. GoogleGirisAktifMi).
+var googleClientId = builder.Configuration["Google:ClientId"];
+var googleClientSecret = builder.Configuration["Google:ClientSecret"];
+if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
+{
+    authBuilder.AddGoogle(options =>
     {
-        options.DefaultScheme = IdentityConstants.ApplicationScheme;
-        options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
-    })
-    .AddIdentityCookies();
+        options.ClientId = googleClientId;
+        options.ClientSecret = googleClientSecret;
+    });
+}
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -140,13 +154,28 @@ app.UseAntiforgery();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+// "Google ile devam et" butonunun post ettiği hedef: Google'ın kendi oturum açma ekranına
+// yönlendirir (Challenge), oradan dönüşte Google'ın CallbackPath'i (varsayılan /signin-google)
+// external cookie'yi oluşturur, ardından kullanıcı HariciGirisTamamla.razor'a (returnUrl ile)
+// yönlendirilir — bkz. o sayfa için ExternalLoginSignInAsync/otomatik kayıt mantığı.
+app.MapPost("/account/google-giris", (HttpContext context, SignInManager<ApplicationUser> signInManager, string? returnUrl) =>
+{
+    var geriDonusYolu = $"/account/harici-giris-tamamla?returnUrl={Uri.EscapeDataString(returnUrl ?? "/projeler")}";
+    var ozellikler = signInManager.ConfigureExternalAuthenticationProperties("Google", geriDonusYolu);
+    return Results.Challenge(ozellikler, ["Google"]);
+});
+
 // Proje keşif özetinin .xlsx olarak indirilmesi — Razor bileşeni yerine düz bir endpoint,
 // çünkü dosya indirme cevabı (Content-Disposition) SignalR devresi üzerinden değil, doğrudan
 // bir HTTP GET isteğiyle (basit <a href> linki) dönmeli.
-app.MapGet("/proje/{id:int}/excel", async (int id, System.Security.Claims.ClaimsPrincipal kullanici, VeriDeposu veri, bool logo = true) =>
+app.MapGet("/proje/{id:int}/excel", async (int id, System.Security.Claims.ClaimsPrincipal kullanici, VeriDeposu veri, UserManager<ApplicationUser> userManager, bool logo = true) =>
 {
     var sahipId = kullanici.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     if (sahipId == null) return Results.Challenge();
+
+    var sahip = await userManager.FindByIdAsync(sahipId);
+    if (sahip == null || !UyelikServisi.DisaAktarimIzinli(sahip.EtkinPlan))
+        return Results.Forbid();
 
     var proje = await veri.ProjeBul(sahipId, id);
     if (proje == null) return Results.NotFound();
@@ -162,10 +191,14 @@ app.MapGet("/proje/{id:int}/excel", async (int id, System.Security.Claims.Claims
 
 // Proje keşif özetinin .pdf olarak indirilmesi — DrawTally başlığı burada sabit (Excel'deki
 // gibi açılıp kapatılabilir değil), çünkü PDF zaten resmi/paylaşılabilir bir rapor formatı.
-app.MapGet("/proje/{id:int}/pdf", async (int id, System.Security.Claims.ClaimsPrincipal kullanici, VeriDeposu veri) =>
+app.MapGet("/proje/{id:int}/pdf", async (int id, System.Security.Claims.ClaimsPrincipal kullanici, VeriDeposu veri, UserManager<ApplicationUser> userManager) =>
 {
     var sahipId = kullanici.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     if (sahipId == null) return Results.Challenge();
+
+    var sahip = await userManager.FindByIdAsync(sahipId);
+    if (sahip == null || !UyelikServisi.DisaAktarimIzinli(sahip.EtkinPlan))
+        return Results.Forbid();
 
     var proje = await veri.ProjeBul(sahipId, id);
     if (proje == null) return Results.NotFound();

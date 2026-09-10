@@ -558,6 +558,65 @@ ul li { margin-bottom: 6px; }
 }
 .bos-durum strong { color: var(--ink); font-size: 0.98rem; }
 
+/* --- Üyelik planları --- */
+.uyelik-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 20px;
+    padding: 12px 16px;
+    background: var(--brand-soft);
+    border: 1px solid var(--brand);
+    border-radius: var(--radius);
+    color: var(--ink);
+    font-size: 0.9rem;
+}
+.uyelik-banner .icon { color: var(--brand); flex-shrink: 0; }
+.uyelik-banner a { margin-left: auto; font-weight: 500; }
+
+.uyelik-kilit { color: var(--ink-faint); }
+.uyelik-kilit:hover { color: var(--accent); }
+
+.uyelik-sinir-uyari a { margin-top: 4px; font-weight: 500; }
+
+.uyelik-plan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+    margin: 24px 0;
+}
+.uyelik-plan-kart {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 22px 20px;
+    background: var(--sheet);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+}
+.uyelik-plan-kart-aktif { border-color: var(--brand); }
+.uyelik-plan-etiket {
+    position: absolute;
+    top: -10px;
+    right: 16px;
+    padding: 2px 10px;
+    background: var(--brand);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 999px;
+}
+.uyelik-plan-baslik { display: flex; align-items: center; gap: 8px; font-size: 1.1rem; font-weight: 600; color: var(--ink); }
+.uyelik-plan-baslik .icon { color: var(--accent); }
+.uyelik-plan-fiyat { color: var(--ink-soft); font-size: 0.88rem; }
+.uyelik-plan-ozellikler { display: flex; flex-direction: column; gap: 8px; list-style: none; padding: 0; margin: 0; flex-grow: 1; }
+.uyelik-plan-ozellikler li { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: var(--ink-soft); }
+.uyelik-plan-ozellikler .icon { color: var(--ok); flex-shrink: 0; }
+
+.uyelik-not { display: flex; align-items: center; gap: 8px; color: var(--ink-faint); font-size: 0.85rem; }
+
 /* --- Giriş / kayıt sayfaları --- */
 .account-shell {
     min-height: 100vh;
@@ -614,6 +673,14 @@ ul li { margin-bottom: 6px; }
 .account-card .account-footer { font-size: 0.88rem; margin-top: 18px; margin-bottom: 0; color: var(--ink-soft); }
 .account-card-wide { max-width: 620px; }
 .account-card-wide h3 { font-size: 0.98rem; margin-top: 22px; margin-bottom: 8px; }
+.account-ayirici { border: none; border-top: 1px solid var(--line-soft); margin: 18px 0; }
+
+/* Kayıt formundaki "Şirket adına kayıt oluyorum" / "Fatura bilgilerimi ekle" onay kutuları
+   işaretlenince ilgili ek alanları JS olmadan, salt CSS :has() ile açar. */
+.kosullu-alan { display: none; padding-left: 2px; border-left: 2px solid var(--line-soft); margin-left: 2px; }
+.kosullu-alan .form-group { padding-left: 14px; }
+.account-card:has(#kurumsalHesap:checked) .kurumsal-alan { display: block; }
+.account-card:has(#faturaBilgisi:checked) .fatura-alan { display: block; }
 .btn-secondary-link {
     width: 100%;
     margin-top: 10px;
@@ -623,6 +690,25 @@ ul li { margin-bottom: 6px; }
     border: 1px solid var(--line);
 }
 .btn-secondary-link:hover { background: var(--surface-2); }
+.hesap-ayirici { display: flex; align-items: center; gap: 10px; margin: 18px 0; color: var(--ink-faint); font-size: 0.8rem; }
+.hesap-ayirici::before, .hesap-ayirici::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
+.btn-google {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background: var(--sheet);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.btn-google:hover { background: var(--surface-2); border-color: var(--ink-faint); }
 .account-error { color: var(--warn); font-weight: 500; font-size: 0.88rem; margin: 8px 0; }
 .field-error { display: block; color: var(--warn); font-size: 0.8rem; margin-top: 4px; }
 .validation-message { display: block; color: var(--warn); font-size: 0.8rem; margin-top: 4px; }

@@ -3,6 +3,7 @@ using System;
 using InsaatMetrajWeb.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace InsaatMetrajWeb.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260910122134_AddUyelikPlani")]
+    partial class AddUyelikPlani
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
@@ -65,21 +68,6 @@ namespace InsaatMetrajWeb.Data.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("FaturaAdresi")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("FaturaBilgisiIstiyor")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("FirmaAdi")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FirmaTelefonu")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("KurumsalHesap")
-                        .HasColumnType("INTEGER");
-
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("INTEGER");
 
@@ -117,18 +105,6 @@ namespace InsaatMetrajWeb.Data.Migrations
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("VergiDairesi")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("VergiKimlikNo")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("YetkiliAdSoyad")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("YetkiliEmail")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");

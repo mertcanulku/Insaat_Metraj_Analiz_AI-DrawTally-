@@ -1,0 +1,92 @@
+@page "/account/harici-giris-tamamla"
+@layout Layout.LoginLayout
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Identity
+@using InsaatMetrajWeb.Data
+@attribute [AllowAnonymous]
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<HariciGirisTamamla> Logger
+
+<PageTitle>Giriş yapılıyor…</PageTitle>
+
+<div class="account-card">
+    <h1>Giriş yapılıyor…</h1>
+    @if (hataMesaji != null)
+    {
+        <p class="account-error">@hataMesaji</p>
+        <p class="account-footer"><a href="account/giris">Giriş sayfasına dön</a></p>
+    }
+</div>
+
+@code {
+    private string? hataMesaji;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var girisBilgisi = await SignInManager.GetExternalLoginInfoAsync();
+        if (girisBilgisi == null)
+        {
+            hataMesaji = "Google girişi tamamlanamadı — lütfen tekrar deneyin.";
+            return;
+        }
+
+        // Bu Google hesabı daha önce bir DrawTally hesabına bağlanmışsa doğrudan giriş yapılır.
+        var girisSonucu = await SignInManager.ExternalLoginSignInAsync(
+            girisBilgisi.LoginProvider, girisBilgisi.ProviderKey, isPersistent: false, bypassTwoFactor: true);
+
+        if (girisSonucu.Succeeded)
+        {
+            Logger.LogInformation("Google ile giriş yapıldı: {Key}", girisBilgisi.ProviderKey);
+            RedirectManager.RedirectTo(ReturnUrl ?? "/projeler");
+            return;
+        }
+
+        // İlk kez Google ile geliyor — e-postasıyla mevcut bir hesap var mı diye bakılır,
+        // yoksa (normal kayıt akışındaki gibi Starter + 7 gün deneme ile) yeni hesap açılır.
+        var email = girisBilgisi.Principal.FindFirstValue(ClaimTypes.Email);
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            hataMesaji = "Google hesabından e-posta bilgisi alınamadı.";
+            return;
+        }
+
+        var kullanici = await UserManager.FindByEmailAsync(email);
+        if (kullanici == null)
+        {
+            kullanici = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                // Google zaten e-postayı doğruladığı için ayrıca 6 haneli kod istenmiyor.
+                EmailConfirmed = true,
+                SozlesmeKabulTarihi = DateTime.UtcNow,
+                DenemeBitisTarihi = DateTime.UtcNow.AddDays(7),
+            };
+
+            var olusturmaSonucu = await UserManager.CreateAsync(kullanici);
+            if (!olusturmaSonucu.Succeeded)
+            {
+                hataMesaji = string.Join(" ", olusturmaSonucu.Errors.Select(e => e.Description));
+                return;
+            }
+
+            Logger.LogInformation("Google ile yeni kullanıcı oluşturuldu: {Email}", email);
+        }
+
+        var baglamaSonucu = await UserManager.AddLoginAsync(kullanici, girisBilgisi);
+        if (!baglamaSonucu.Succeeded)
+        {
+            hataMesaji = "Google hesabı bu kullanıcıya bağlanamadı.";
+            return;
+        }
+
+        await SignInManager.SignInAsync(kullanici, isPersistent: false);
+        RedirectManager.RedirectTo(ReturnUrl ?? "/projeler");
+    }
+}

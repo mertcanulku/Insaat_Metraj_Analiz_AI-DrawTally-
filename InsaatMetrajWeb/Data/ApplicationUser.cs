@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using InsaatMetrajWeb.Models;
 using Microsoft.AspNetCore.Identity;
 
 namespace InsaatMetrajWeb.Data;
@@ -11,4 +13,43 @@ public class ApplicationUser : IdentityUser
 
     /// <summary>Kullanım koşullarını kabul ettiği an (UTC). Kayıt sırasında zorunlu olduğu için hep dolu olur.</summary>
     public DateTime? SozlesmeKabulTarihi { get; set; }
+
+    /// <summary>Kullanıcının satın aldığı/seçtiği plan. Kayıt sırasında Starter olarak başlar.</summary>
+    public UyelikPlani Plan { get; set; } = UyelikPlani.Starter;
+
+    /// <summary>
+    /// Kayıt sırasında verilen 7 günlük ücretsiz Pro deneme süresinin bitiş anı (UTC). Deneme
+    /// bittiğinde veya kullanıcı manuel bir plan seçtiğinde null'a döner — bkz. <see cref="EtkinPlan"/>.
+    /// </summary>
+    public DateTime? DenemeBitisTarihi { get; set; }
+
+    /// <summary>
+    /// Kullanıcının şu anda gerçekte sahip olduğu plan — deneme süresi hâlâ aktifse Plan alanı
+    /// ne olursa olsun Pro döner, aksi halde Plan'ın kendisi döner. Veritabanına ayrıca sütun
+    /// olarak yazılmaz, bkz. [NotMapped].
+    /// </summary>
+    [NotMapped]
+    public UyelikPlani EtkinPlan =>
+        DenemeBitisTarihi.HasValue && DenemeBitisTarihi.Value > DateTime.UtcNow
+            ? UyelikPlani.Pro
+            : Plan;
+
+    // --- Şirket / fatura bilgileri (kayıt sırasında isteğe bağlı olarak doldurulur) ---
+
+    /// <summary>Kayıt sırasında "Şirket adına kayıt oluyorum" işaretlendiyse true.</summary>
+    public bool KurumsalHesap { get; set; }
+
+    public string? FirmaAdi { get; set; }
+    public string? FirmaTelefonu { get; set; }
+    public string? YetkiliAdSoyad { get; set; }
+    public string? YetkiliEmail { get; set; }
+
+    /// <summary>Kayıt sırasında "Fatura bilgilerimi ekle" işaretlendiyse true.</summary>
+    public bool FaturaBilgisiIstiyor { get; set; }
+
+    public string? VergiDairesi { get; set; }
+
+    /// <summary>Kurumsal hesapta Vergi Kimlik No (10 hane), bireysel hesapta TC Kimlik No (11 hane).</summary>
+    public string? VergiKimlikNo { get; set; }
+    public string? FaturaAdresi { get; set; }
 }

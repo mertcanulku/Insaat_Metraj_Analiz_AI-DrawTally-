@@ -9,11 +9,12 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject EmailDogrulamaServisi DogrulamaServisi
 @inject IdentityRedirectManager RedirectManager
+@inject IConfiguration Configuration
 @inject ILogger<Register> Logger
 
 <PageTitle>Kayıt Ol</PageTitle>
 
-<div class="account-card">
+<div class="account-card account-card-wide">
     <h1>Hesap Oluştur</h1>
 
     <StatusMessage Message="@errorMessage" />
@@ -40,6 +41,64 @@
             <ValidationMessage For="() => Input.ConfirmPassword" class="field-error" />
         </div>
 
+        <hr class="account-ayirici" />
+
+        <div class="form-check">
+            <label>
+                <InputCheckbox @bind-Value="Input.KurumsalHesap" id="kurumsalHesap" />
+                Şirket adına kayıt oluyorum
+            </label>
+        </div>
+
+        <div class="kosullu-alan kurumsal-alan">
+            <div class="form-group">
+                <label for="firmaAdi">Firma Adı</label>
+                <InputText @bind-Value="Input.FirmaAdi" id="firmaAdi" class="form-control" placeholder="örn: ABC İnşaat Ltd. Şti." />
+                <ValidationMessage For="() => Input.FirmaAdi" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="firmaTelefonu">Firma Telefonu</label>
+                <InputText @bind-Value="Input.FirmaTelefonu" id="firmaTelefonu" class="form-control" placeholder="0212 000 00 00" />
+            </div>
+            <div class="form-group">
+                <label for="yetkiliAdSoyad">Yetkili Adı Soyadı</label>
+                <InputText @bind-Value="Input.YetkiliAdSoyad" id="yetkiliAdSoyad" class="form-control" placeholder="ad soyad" />
+                <ValidationMessage For="() => Input.YetkiliAdSoyad" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="yetkiliEmail">Yetkili E-postası</label>
+                <InputText @bind-Value="Input.YetkiliEmail" id="yetkiliEmail" class="form-control" placeholder="yetkili@firma.com" />
+                <ValidationMessage For="() => Input.YetkiliEmail" class="field-error" />
+            </div>
+        </div>
+
+        <div class="form-check">
+            <label>
+                <InputCheckbox @bind-Value="Input.FaturaBilgisiIstiyor" id="faturaBilgisi" />
+                Fatura bilgilerimi ekle
+            </label>
+        </div>
+
+        <div class="kosullu-alan fatura-alan">
+            <div class="form-group">
+                <label for="vergiDairesi">Vergi Dairesi</label>
+                <InputText @bind-Value="Input.VergiDairesi" id="vergiDairesi" class="form-control" />
+                <ValidationMessage For="() => Input.VergiDairesi" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="vergiKimlikNo">Vergi Kimlik No / TC Kimlik No</label>
+                <InputText @bind-Value="Input.VergiKimlikNo" id="vergiKimlikNo" class="form-control" placeholder="10 (VKN) veya 11 (TCKN) haneli" />
+                <ValidationMessage For="() => Input.VergiKimlikNo" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="faturaAdresi">Fatura Adresi</label>
+                <InputTextArea @bind-Value="Input.FaturaAdresi" id="faturaAdresi" class="form-control" rows="2" />
+                <ValidationMessage For="() => Input.FaturaAdresi" class="field-error" />
+            </div>
+        </div>
+
+        <hr class="account-ayirici" />
+
         <div class="form-check">
             <label>
                 <InputCheckbox @bind-Value="Input.SozlesmeyiKabulEt" />
@@ -50,6 +109,14 @@
 
         <button type="submit" class="btn-primary">Kayıt Ol</button>
     </EditForm>
+
+    @if (GoogleGirisAktif)
+    {
+        <div class="hesap-ayirici"><span>veya</span></div>
+        <form method="post" action="account/google-giris">
+            <button type="submit" class="btn-google"><GoogleLogoIcon /> Google ile devam et</button>
+        </form>
+    }
 
     <p class="account-footer">
         Zaten hesabın var mı? <a href="account/giris">Giriş yap</a>
@@ -62,6 +129,8 @@
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
 
+    private bool GoogleGirisAktif => !string.IsNullOrWhiteSpace(Configuration["Google:ClientId"]);
+
     private async Task RegisterUser()
     {
         var user = new ApplicationUser
@@ -70,6 +139,18 @@
             Email = Input.Email,
             EmailConfirmed = false,
             SozlesmeKabulTarihi = DateTime.UtcNow,
+            // Yeni kullanıcı Starter'da başlar ama 7 gün boyunca Pro özelliklerini deneyebilir —
+            // bkz. ApplicationUser.EtkinPlan.
+            DenemeBitisTarihi = DateTime.UtcNow.AddDays(7),
+            KurumsalHesap = Input.KurumsalHesap,
+            FirmaAdi = Input.KurumsalHesap ? Input.FirmaAdi : null,
+            FirmaTelefonu = Input.KurumsalHesap ? Input.FirmaTelefonu : null,
+            YetkiliAdSoyad = Input.KurumsalHesap ? Input.YetkiliAdSoyad : null,
+            YetkiliEmail = Input.KurumsalHesap ? Input.YetkiliEmail : null,
+            FaturaBilgisiIstiyor = Input.FaturaBilgisiIstiyor,
+            VergiDairesi = Input.FaturaBilgisiIstiyor ? Input.VergiDairesi : null,
+            VergiKimlikNo = Input.FaturaBilgisiIstiyor ? Input.VergiKimlikNo : null,
+            FaturaAdresi = Input.FaturaBilgisiIstiyor ? Input.FaturaAdresi : null,
         };
 
         var result = await UserManager.CreateAsync(user, Input.Password);
@@ -93,7 +174,7 @@
         RedirectManager.RedirectTo(yol);
     }
 
-    private sealed class InputModel
+    private sealed class InputModel : IValidatableObject
     {
         [Required(ErrorMessage = "E-posta gerekli.")]
         [EmailAddress(ErrorMessage = "Geçerli bir e-posta girin.")]
@@ -107,7 +188,49 @@
         [Compare(nameof(Password), ErrorMessage = "Şifreler eşleşmiyor.")]
         public string ConfirmPassword { get; set; } = "";
 
+        // --- Şirket bilgileri (yalnızca KurumsalHesap işaretliyse zorunlu) ---
+        public bool KurumsalHesap { get; set; }
+        public string? FirmaAdi { get; set; }
+        public string? FirmaTelefonu { get; set; }
+        public string? YetkiliAdSoyad { get; set; }
+        public string? YetkiliEmail { get; set; }
+
+        // --- Fatura bilgileri (yalnızca FaturaBilgisiIstiyor işaretliyse zorunlu) ---
+        public bool FaturaBilgisiIstiyor { get; set; }
+        public string? VergiDairesi { get; set; }
+        public string? VergiKimlikNo { get; set; }
+        public string? FaturaAdresi { get; set; }
+
         [Range(typeof(bool), "true", "true", ErrorMessage = "Devam etmek için Kullanım Koşulları'nı kabul etmelisiniz.")]
         public bool SozlesmeyiKabulEt { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (KurumsalHesap)
+            {
+                if (string.IsNullOrWhiteSpace(FirmaAdi))
+                    yield return new ValidationResult("Firma adı gerekli.", new[] { nameof(FirmaAdi) });
+                if (string.IsNullOrWhiteSpace(YetkiliAdSoyad))
+                    yield return new ValidationResult("Yetkili adı soyadı gerekli.", new[] { nameof(YetkiliAdSoyad) });
+                if (string.IsNullOrWhiteSpace(YetkiliEmail))
+                    yield return new ValidationResult("Yetkili e-postası gerekli.", new[] { nameof(YetkiliEmail) });
+                else if (!new EmailAddressAttribute().IsValid(YetkiliEmail))
+                    yield return new ValidationResult("Geçerli bir yetkili e-postası girin.", new[] { nameof(YetkiliEmail) });
+            }
+
+            if (FaturaBilgisiIstiyor)
+            {
+                if (string.IsNullOrWhiteSpace(VergiDairesi))
+                    yield return new ValidationResult("Vergi dairesi gerekli.", new[] { nameof(VergiDairesi) });
+
+                if (string.IsNullOrWhiteSpace(VergiKimlikNo))
+                    yield return new ValidationResult("Vergi kimlik no gerekli.", new[] { nameof(VergiKimlikNo) });
+                else if (VergiKimlikNo.Length is not (10 or 11) || !VergiKimlikNo.All(char.IsDigit))
+                    yield return new ValidationResult("Vergi kimlik no 10 haneli (VKN) veya 11 haneli (TCKN) rakamlardan oluşmalı.", new[] { nameof(VergiKimlikNo) });
+
+                if (string.IsNullOrWhiteSpace(FaturaAdresi))
+                    yield return new ValidationResult("Fatura adresi gerekli.", new[] { nameof(FaturaAdresi) });
+            }
+        }
     }
 }

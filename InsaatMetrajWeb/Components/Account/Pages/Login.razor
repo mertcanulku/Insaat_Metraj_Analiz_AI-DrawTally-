@@ -12,6 +12,7 @@
 @inject EmailDogrulamaServisi DogrulamaServisi
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject IConfiguration Configuration
 @inject ILogger<Login> Logger
 
 <PageTitle>Giriş Yap</PageTitle>
@@ -47,6 +48,15 @@
         <button type="submit" class="btn-primary">Giriş Yap</button>
     </EditForm>
 
+    @if (GoogleGirisAktif)
+    {
+        <div class="hesap-ayirici"><span>veya</span></div>
+        <form method="post" action="account/google-giris">
+            <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+            <button type="submit" class="btn-google"><GoogleLogoIcon /> Google ile devam et</button>
+        </form>
+    }
+
     <p class="account-footer">
         Hesabın yok mu? <a href="account/kayit">Kayıt ol</a>
     </p>
@@ -63,6 +73,8 @@
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
+
+    private bool GoogleGirisAktif => !string.IsNullOrWhiteSpace(Configuration["Google:ClientId"]);
 
     private async Task LoginUser()
     {

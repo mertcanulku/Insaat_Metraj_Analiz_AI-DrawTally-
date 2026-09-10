@@ -1,12 +1,22 @@
 @page "/projeler"
 @rendermode InteractiveServer
 @attribute [Authorize]
+@using Microsoft.AspNetCore.Identity
 @inject VeriDeposu Veri
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthProvider
+@inject UserManager<ApplicationUser> UserManager
 
 <h1>Projeler</h1>
 <p>Devam etmek istediğin projeyi seç, ya da yeni bir proje oluştur.</p>
+
+@if (etkinPlan == UyelikPlani.Pro && denemeGunKaldi.HasValue)
+{
+    <div class="uyelik-banner">
+        <Icon Name="zap" /> Ücretsiz Pro deneme sürenden <strong>@denemeGunKaldi gün</strong> kaldı.
+        <a href="uyelik">Planları gör</a>
+    </div>
+}
 
 @if (projeler.Count > 0)
 {
@@ -63,8 +73,15 @@ else
                             <a href="@($"proje/{p.Id}")">Aç <Icon Name="arrow-right" /></a>
                             @if (p.MetrajKalemleri.Count > 0)
                             {
-                                <a href="@($"proje/{p.Id}/excel?logo={(excelLogoBasligiEkle ? "true" : "false")}")" title="Excel'e aktar"><Icon Name="download" /></a>
-                                <a href="@($"proje/{p.Id}/pdf")" title="PDF'e aktar"><Icon Name="file-text" /></a>
+                                @if (disaAktarimIzinli)
+                                {
+                                    <a href="@($"proje/{p.Id}/excel?logo={(excelLogoBasligiEkle ? "true" : "false")}")" title="Excel'e aktar"><Icon Name="download" /></a>
+                                    <a href="@($"proje/{p.Id}/pdf")" title="PDF'e aktar"><Icon Name="file-text" /></a>
+                                }
+                                else
+                                {
+                                    <a href="uyelik" title="Excel/PDF dışa aktarım Pro ve Business planlarında" class="uyelik-kilit"><Icon Name="shield" /> Yükselt</a>
+                                }
                             }
                         </td>
                     </tr>
@@ -74,28 +91,55 @@ else
     </div>
 }
 
-<h3>Yeni Proje Oluştur</h3>
-<div class="form-satir">
-    <label>Proje Adı:</label>
-    <input @bind="yeniProjeAdi" placeholder="örn: Sahil Sitesi - B Blok" />
-</div>
-<button @onclick="YeniProjeOlustur"><Icon Name="plus" /> Proje Oluştur</button>
+@if (projeSinirinaUlasildi)
+{
+    <div class="bos-durum uyelik-sinir-uyari">
+        <strong>Plan sınırına ulaştın</strong>
+        <span>@UyelikServisi.PlanAdi(etkinPlan) planında en fazla @projeSiniri proje oluşturabilirsin.</span>
+        <a href="uyelik">Planları gör</a>
+    </div>
+}
+else
+{
+    <h3>Yeni Proje Oluştur</h3>
+    <div class="form-satir">
+        <label>Proje Adı:</label>
+        <input @bind="yeniProjeAdi" placeholder="örn: Sahil Sitesi - B Blok" />
+    </div>
+    <button @onclick="YeniProjeOlustur"><Icon Name="plus" /> Proje Oluştur</button>
+}
 
 @code {
     private string yeniProjeAdi = "";
     private List<Proje> projeler = new();
     private string sahipId = "";
     private bool excelLogoBasligiEkle = true;
+    private UyelikPlani etkinPlan = UyelikPlani.Starter;
+    private int projeSiniri;
+    private bool disaAktarimIzinli;
+    private int? denemeGunKaldi;
 
     protected override async Task OnInitializedAsync()
     {
         sahipId = await AuthProvider.GetUserIdAsync();
         projeler = await Veri.ProjeleriListele(sahipId);
+
+        var kullanici = await UserManager.FindByIdAsync(sahipId);
+        if (kullanici != null)
+        {
+            etkinPlan = kullanici.EtkinPlan;
+            disaAktarimIzinli = UyelikServisi.DisaAktarimIzinli(etkinPlan);
+            if (kullanici.DenemeBitisTarihi is { } denemeBitis && denemeBitis > DateTime.UtcNow)
+                denemeGunKaldi = (int)Math.Ceiling((denemeBitis - DateTime.UtcNow).TotalDays);
+        }
+        projeSiniri = UyelikServisi.ProjeSiniri(etkinPlan);
     }
+
+    private bool projeSinirinaUlasildi => projeler.Count >= projeSiniri;
 
     private async Task YeniProjeOlustur()
     {
-        if (string.IsNullOrWhiteSpace(yeniProjeAdi)) return;
+        if (string.IsNullOrWhiteSpace(yeniProjeAdi) || projeSinirinaUlasildi) return;
         var yeniProje = await Veri.ProjeEkle(sahipId, yeniProjeAdi.Trim());
         Nav.NavigateTo($"proje/{yeniProje.Id}");
     }
