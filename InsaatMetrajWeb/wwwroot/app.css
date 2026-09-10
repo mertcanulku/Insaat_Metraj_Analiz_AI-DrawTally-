@@ -164,7 +164,8 @@ a { color: var(--brand); }
     padding: 26px 20px;
 }
 
-.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; text-decoration: none; transition: opacity 0.15s ease; }
+.brand:hover { opacity: 0.82; }
 .brand-logo { max-width: 180px; height: auto; }
 .brand-mark { width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.6); }
 .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
@@ -567,7 +568,8 @@ ul li { margin-bottom: 6px; }
         var(--paper);
 }
 .account-logo { max-width: 200px; height: auto; }
-.account-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.account-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; text-decoration: none; transition: opacity 0.15s ease; }
+.account-brand:hover { opacity: 0.82; }
 .account-brand .brand-text { align-items: center; }
 .account-brand .brand-mark { width: 56px; height: 56px; border-radius: 14px; }
 .account-brand .brand-name { font-size: 1.35rem; }
