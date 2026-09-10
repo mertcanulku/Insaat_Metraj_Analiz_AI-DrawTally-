@@ -72,4 +72,23 @@
     window.DrawTallyTheme = { toggle: toggle };
 
     apply(effectiveTheme());
+
+    // Blazor'un "enhanced navigation"ı bir NavLink tıklamasında sayfayı tam
+    // yenilemeden mevcut DOM'u sunucudan gelen yeni HTML ile birleştirir. Bu
+    // birleştirme sırasında <html> üzerine JS'in sonradan eklediği data-theme
+    // niteliği (sunucu render'ında hiç yer almadığı için) siliniyor; sonuç
+    // olarak tema sıfırlanıp tarayıcının sistem tercihine (genelde koyu) düşüyor.
+    // Her enhanced navigation sonrasında temayı yeniden uygulayarak bunu önlüyoruz.
+    // "Blazor" nesnesi blazor.web.js senkron olarak çalıştığında oluşur; bu script
+    // <head>'te ondan önce çalıştığı için nesnenin hazır olmasını kısaca bekliyoruz.
+    function attachEnhancedLoadHandler() {
+        if (window.Blazor && typeof window.Blazor.addEventListener === "function") {
+            window.Blazor.addEventListener("enhancedload", function () {
+                apply(effectiveTheme());
+            });
+        } else {
+            setTimeout(attachEnhancedLoadHandler, 50);
+        }
+    }
+    attachEnhancedLoadHandler();
 })();

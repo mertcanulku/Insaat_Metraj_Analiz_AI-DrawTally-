@@ -329,6 +329,11 @@ code {
     background: var(--surface-2);
 }
 .veri-tablo tbody tr:hover { background: var(--surface-2); }
+.satir-aksiyonlar { display: flex; align-items: center; gap: 14px; }
+.satir-aksiyonlar a { display: inline-flex; align-items: center; gap: 4px; }
+
+.excel-secenek { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 16px; font-size: 0.85rem; color: var(--ink-soft); cursor: pointer; }
+.excel-secenek input { cursor: pointer; }
 
 .durum-basarili, .durum-uyari, .durum-hata {
     display: inline-flex;

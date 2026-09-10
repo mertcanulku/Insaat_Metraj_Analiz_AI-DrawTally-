@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <!-- PDF'lerden metin çıkarmak için: ücretsiz, açık kaynak (MIT lisanslı) -->
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
     <PackageReference Include="MailKit" Version="4.13.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
@@ -24,6 +25,7 @@
          bizim kodumuzdan önce oluşuyordu) — kütüphane o zamandan beri 3.x kararlı sürüme ulaştı. -->
     <PackageReference Include="ACadSharp" Version="3.7.1" />
     <PackageReference Include="PDFtoImage" Version="5.4.0" />
+    <PackageReference Include="QuestPDF" Version="2024.10.3" />
   </ItemGroup>
 
   <ItemGroup>

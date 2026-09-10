@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 
+// QuestPDF (PDF dışa aktarım için) — Community lisansı, küçük/orta ölçekli kullanım için ücretsizdir.
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // WebApplication.CreateBuilder yalnızca ASPNETCORE_ENVIRONMENT=Development iken
@@ -136,5 +139,42 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Proje keşif özetinin .xlsx olarak indirilmesi — Razor bileşeni yerine düz bir endpoint,
+// çünkü dosya indirme cevabı (Content-Disposition) SignalR devresi üzerinden değil, doğrudan
+// bir HTTP GET isteğiyle (basit <a href> linki) dönmeli.
+app.MapGet("/proje/{id:int}/excel", async (int id, System.Security.Claims.ClaimsPrincipal kullanici, VeriDeposu veri, bool logo = true) =>
+{
+    var sahipId = kullanici.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    if (sahipId == null) return Results.Challenge();
+
+    var proje = await veri.ProjeBul(sahipId, id);
+    if (proje == null) return Results.NotFound();
+
+    var dosyaAdi = string.Concat(proje.Ad.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+    if (dosyaAdi.Length == 0) dosyaAdi = "proje";
+
+    var icerik = ExcelDisaAktarimServisi.ProjeyiXlsxOlarakOlustur(proje, logoBasligiEkle: logo);
+    return Results.File(icerik,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        $"{dosyaAdi}-kesif-ozeti.xlsx");
+}).RequireAuthorization();
+
+// Proje keşif özetinin .pdf olarak indirilmesi — DrawTally başlığı burada sabit (Excel'deki
+// gibi açılıp kapatılabilir değil), çünkü PDF zaten resmi/paylaşılabilir bir rapor formatı.
+app.MapGet("/proje/{id:int}/pdf", async (int id, System.Security.Claims.ClaimsPrincipal kullanici, VeriDeposu veri) =>
+{
+    var sahipId = kullanici.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    if (sahipId == null) return Results.Challenge();
+
+    var proje = await veri.ProjeBul(sahipId, id);
+    if (proje == null) return Results.NotFound();
+
+    var dosyaAdi = string.Concat(proje.Ad.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+    if (dosyaAdi.Length == 0) dosyaAdi = "proje";
+
+    var icerik = PdfDisaAktarimServisi.ProjeyiPdfOlarakOlustur(proje);
+    return Results.File(icerik, "application/pdf", $"{dosyaAdi}-kesif-ozeti.pdf");
+}).RequireAuthorization();
 
 app.Run();

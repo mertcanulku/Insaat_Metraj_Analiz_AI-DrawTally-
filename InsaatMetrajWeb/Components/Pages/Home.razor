@@ -35,6 +35,13 @@
 }
 else
 {
+    @if (projeler.Any(p => p.MetrajKalemleri.Count > 0))
+    {
+        <label class="excel-secenek">
+            <input type="checkbox" @bind="excelLogoBasligiEkle" />
+            Excel'e aktarırken DrawTally başlığı olsun
+        </label>
+    }
     <div class="veri-tablo-wrap">
         <table class="veri-tablo">
             <thead>
@@ -52,7 +59,14 @@ else
                         <td>@p.Ad</td>
                         <td>@p.MetrajKalemleri.Count</td>
                         <td>@ParaFormatlayici.Formatla(p.ToplamMaliyet())</td>
-                        <td><a href="@($"proje/{p.Id}")">Aç <Icon Name="arrow-right" /></a></td>
+                        <td class="satir-aksiyonlar">
+                            <a href="@($"proje/{p.Id}")">Aç <Icon Name="arrow-right" /></a>
+                            @if (p.MetrajKalemleri.Count > 0)
+                            {
+                                <a href="@($"proje/{p.Id}/excel?logo={(excelLogoBasligiEkle ? "true" : "false")}")" title="Excel'e aktar"><Icon Name="download" /></a>
+                                <a href="@($"proje/{p.Id}/pdf")" title="PDF'e aktar"><Icon Name="file-text" /></a>
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -71,6 +85,7 @@ else
     private string yeniProjeAdi = "";
     private List<Proje> projeler = new();
     private string sahipId = "";
+    private bool excelLogoBasligiEkle = true;
 
     protected override async Task OnInitializedAsync()
     {
