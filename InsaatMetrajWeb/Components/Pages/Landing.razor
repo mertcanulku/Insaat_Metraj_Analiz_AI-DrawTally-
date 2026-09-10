@@ -24,6 +24,7 @@
                 <a href="#ozellikler">@T("Özellikler", "Features")</a>
             </nav>
             <div class="landing-header-actions">
+                <ThemeToggle />
                 <button class="landing-lang-toggle" @onclick="ToggleLang" title="Türkçe / English">
                     <span class="@(lang == "tr" ? "aktif" : "")">TR</span>
                     <span class="landing-lang-sep">/</span>

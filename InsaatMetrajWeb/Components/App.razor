@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0B1220" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F6F7FA" />
     <title>DrawTally — İnşaat Metraj ve Hakediş Programı</title>
     <base href="/" />
     <link rel="icon" type="image/svg+xml" href="images/brand/drawtally-icon-only.svg" />
@@ -12,6 +12,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="app.css" />
+    <!-- Sayfa boyanmadan önce senkron çalışır: tema tercihi (localStorage veya sistem)
+         data-theme olarak <html>'e uygulanır, koyu/açık "flaş" oluşmaz. -->
+    <script src="js/theme.js"></script>
     <HeadOutlet />
 </head>
 <body>
