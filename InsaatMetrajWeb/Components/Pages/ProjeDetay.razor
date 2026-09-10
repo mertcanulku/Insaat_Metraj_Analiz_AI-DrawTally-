@@ -63,8 +63,8 @@ else
                         <td>@k.Poz.Ad</td>
                         <td>@k.OlcumDetayi</td>
                         <td>@k.Miktar.ToString("0.000")</td>
-                        <td>@k.Poz.BirimMaliyet().ToString("N2")</td>
-                        <td>@k.ToplamMaliyet().ToString("N2")</td>
+                        <td>@ParaFormatlayici.Formatla(k.Poz.BirimMaliyet())</td>
+                        <td>@ParaFormatlayici.Formatla(k.ToplamMaliyet())</td>
                         <td><button class="btn-danger" @onclick="() => KalemSil(k.Id)"><Icon Name="trash" /> Sil</button></td>
                     </tr>
                 }
@@ -74,13 +74,13 @@ else
                 {
                     <tr>
                         <td colspan="6" style="text-align:right"><strong>@DisiplinTespitServisi.GosterimAdi(secilenDisiplin.Value) ARA TOPLAM</strong></td>
-                        <td><strong>@GosterilenKalemler().Sum(k => k.ToplamMaliyet()).ToString("N2") TL</strong></td>
+                        <td><strong>@ParaFormatlayici.Formatla(GosterilenKalemler().Sum(k => k.ToplamMaliyet()))</strong></td>
                         <td></td>
                     </tr>
                 }
                 <tr>
-                    <td colspan="6" style="text-align:right"><strong>GENEL TOPLAM (tüm disiplinler)</strong></td>
-                    <td><strong>@proje.ToplamMaliyet().ToString("N2") TL</strong></td>
+                    <td colspan="6" style="text-align:right"><strong><Icon Name="banknote" Size="14" /> GENEL TOPLAM (tüm disiplinler)</strong></td>
+                    <td><strong>@ParaFormatlayici.Formatla(proje.ToplamMaliyet())</strong></td>
                     <td></td>
                 </tr>
             </tfoot>

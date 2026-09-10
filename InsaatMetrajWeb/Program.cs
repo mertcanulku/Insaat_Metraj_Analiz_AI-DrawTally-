@@ -1,8 +1,10 @@
+using System.Globalization;
 using InsaatMetrajWeb.Components;
 using InsaatMetrajWeb.Components.Account;
 using InsaatMetrajWeb.Data;
 using InsaatMetrajWeb.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +22,18 @@ if (!string.IsNullOrEmpty(port))
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Para birimi tespiti: ziyaretçinin tarayıcısının Accept-Language'ına göre CultureInfo.CurrentCulture
+// set edilir (bkz. app.UseRequestLocalization altta) — ParaFormatlayici bunu kullanarak tutarları
+// TL/USD/EUR vb. hangi ülkeden bağlanılıyorsa o ülkenin para birimi sembolüyle gösterir. Varsayılan
+// (Accept-Language okunamazsa) Türkiye — uygulamanın asıl kitlesi.
+var desteklenenKulturler = CultureInfo.GetCultures(CultureTypes.SpecificCultures);
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture("tr-TR");
+    options.SupportedCultures = desteklenenKulturler;
+    options.SupportedUICultures = desteklenenKulturler;
+});
 
 // Poz/Rayiç/Alias kütüphanesi (ÇŞB verisi, tüm kullanıcılar arasında ortak) — uygulama
 // ömrü boyunca bir kez veritabanından yüklenip bellekte tutulur, bkz. aşağıdaki seed bloğu.
@@ -110,6 +124,8 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+
+app.UseRequestLocalization();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

@@ -20,8 +20,8 @@
             <div class="kpi-deger">@projeler.Sum(p => p.MetrajKalemleri.Count)</div>
         </div>
         <div class="kpi-kart">
-            <div class="kpi-baslik"><Icon Name="check" /> Toplam Keşif Bedeli</div>
-            <div class="kpi-deger">@projeler.Sum(p => p.ToplamMaliyet()).ToString("N0") TL</div>
+            <div class="kpi-baslik"><Icon Name="banknote" /> Toplam Keşif Bedeli</div>
+            <div class="kpi-deger">@ParaFormatlayici.Formatla(projeler.Sum(p => p.ToplamMaliyet()), 0)</div>
         </div>
     </div>
 }
@@ -51,7 +51,7 @@ else
                     <tr>
                         <td>@p.Ad</td>
                         <td>@p.MetrajKalemleri.Count</td>
-                        <td>@p.ToplamMaliyet().ToString("N2") TL</td>
+                        <td>@ParaFormatlayici.Formatla(p.ToplamMaliyet())</td>
                         <td><a href="@($"proje/{p.Id}")">Aç <Icon Name="arrow-right" /></a></td>
                     </tr>
                 }
