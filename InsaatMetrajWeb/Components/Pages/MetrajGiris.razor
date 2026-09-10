@@ -24,7 +24,7 @@ else
         var bulunanPoz = Veri.PozAra(pozAramaMetni);
         @if (bulunanPoz != null)
         {
-            <p class="basarili-mesaj"><Icon Name="check" /> Eşleşti: <strong>@bulunanPoz.PozKodu</strong> — @bulunanPoz.Ad (@bulunanPoz.Birim, birim maliyet: @bulunanPoz.BirimMaliyet().ToString("N2") TL)</p>
+            <p class="basarili-mesaj"><Icon Name="check" /> Eşleşti: <strong>@bulunanPoz.PozKodu</strong> — @bulunanPoz.Ad (@bulunanPoz.Birim, birim maliyet: @ParaFormatlayici.Formatla(bulunanPoz.BirimMaliyet()))</p>
         }
         else
         {

@@ -1,12 +1,15 @@
 @inherits LayoutComponentBase
 
 <div class="account-shell">
-    <div class="account-brand">
+    <div class="account-theme-toggle">
+        <ThemeToggle />
+    </div>
+    <a href="/" class="account-brand">
         <img src="images/brand/drawtally-icon-only.svg" alt="" class="brand-mark" />
         <div class="brand-text">
             <span class="brand-name">DrawTally</span>
             <span class="brand-sub">by Drongos Global</span>
         </div>
-    </div>
+    </a>
     @Body
 </div>

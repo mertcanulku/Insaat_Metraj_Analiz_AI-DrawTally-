@@ -37,7 +37,7 @@ else
                     <th>Poz Kodu</th>
                     <th>Ad</th>
                     <th>Birim</th>
-                    <th>Birim Maliyet</th>
+                    <th><Icon Name="banknote" Size="14" /> Birim Maliyet</th>
                 </tr>
             </thead>
             <tbody>
@@ -47,7 +47,7 @@ else
                         <td>@p.PozKodu</td>
                         <td>@p.Ad</td>
                         <td>@p.Birim</td>
-                        <td>@p.BirimMaliyet().ToString("N2")</td>
+                        <td>@ParaFormatlayici.Formatla(p.BirimMaliyet())</td>
                     </tr>
                 }
             </tbody>

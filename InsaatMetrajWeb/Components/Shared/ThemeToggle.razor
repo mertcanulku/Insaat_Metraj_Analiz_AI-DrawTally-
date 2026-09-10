@@ -1,0 +1,12 @@
+@* Açık/koyu tema düğmesi — saf JS ile çalışır (bkz. wwwroot/js/theme.js), Blazor
+   interaktif render modu gerektirmez, bu yüzden statik SSR sayfalarda da çalışır. *@
+<button type="button" class="theme-toggle @CssClass" data-theme-toggle
+        onclick="DrawTallyTheme.toggle()" aria-pressed="false" aria-label="Koyu moda geç" title="Koyu moda geç">
+    <Icon Name="sun" Size="16" CssClass="icon-sun" />
+    <Icon Name="moon" Size="16" CssClass="icon-moon" />
+</button>
+
+@code {
+    [Parameter]
+    public string CssClass { get; set; } = "";
+}
