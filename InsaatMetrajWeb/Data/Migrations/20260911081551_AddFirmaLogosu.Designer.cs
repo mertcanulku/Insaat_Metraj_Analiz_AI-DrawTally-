@@ -3,6 +3,7 @@ using System;
 using InsaatMetrajWeb.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace InsaatMetrajWeb.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911081551_AddFirmaLogosu")]
+    partial class AddFirmaLogosu
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
@@ -113,12 +116,6 @@ namespace InsaatMetrajWeb.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("SecurityStamp")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SifreSifirlamaKodu")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("SifreSifirlamaKoduSonGecerlilik")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("SozlesmeKabulTarihi")

@@ -76,6 +76,7 @@ builder.Services.AddCascadingAuthenticationState();
 // E-posta doğrulama kodu gönderimi (Smtp:Host boşsa kod ekranda gösterilir, bkz. SmtpEmailGonderici).
 builder.Services.AddScoped<IEmailGonderici, SmtpEmailGonderici>();
 builder.Services.AddScoped<EmailDogrulamaServisi>();
+builder.Services.AddScoped<SifreSifirlamaServisi>();
 
 var authBuilder = builder.Services.AddAuthentication(options =>
 {
@@ -193,7 +194,7 @@ app.MapGet("/proje/{id:int}/excel", async (int id, System.Security.Claims.Claims
     var dosyaAdi = string.Concat(proje.Ad.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
     if (dosyaAdi.Length == 0) dosyaAdi = "proje";
 
-    var icerik = ExcelDisaAktarimServisi.ProjeyiXlsxOlarakOlustur(proje, logoBasligiEkle: logo);
+    var icerik = ExcelDisaAktarimServisi.ProjeyiXlsxOlarakOlustur(proje, logoBasligiEkle: logo, firmaLogosu: sahip.FirmaLogoVerisi);
     return Results.File(icerik,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         $"{dosyaAdi}-kesif-ozeti.xlsx");
@@ -216,8 +217,21 @@ app.MapGet("/proje/{id:int}/pdf", async (int id, System.Security.Claims.ClaimsPr
     var dosyaAdi = string.Concat(proje.Ad.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
     if (dosyaAdi.Length == 0) dosyaAdi = "proje";
 
-    var icerik = PdfDisaAktarimServisi.ProjeyiPdfOlarakOlustur(proje);
+    var icerik = PdfDisaAktarimServisi.ProjeyiPdfOlarakOlustur(proje, firmaLogosu: sahip.FirmaLogoVerisi);
     return Results.File(icerik, "application/pdf", $"{dosyaAdi}-kesif-ozeti.pdf");
+}).RequireAuthorization();
+
+// Firma logosu önizlemesi — Profil.razor'daki <img> burada gösterir. Yalnızca oturum sahibinin
+// kendi logosu (parametre almadan doğrudan ClaimsPrincipal'den) döner.
+app.MapGet("/profil/logo", async (System.Security.Claims.ClaimsPrincipal kullanici, UserManager<ApplicationUser> userManager) =>
+{
+    var sahipId = kullanici.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    if (sahipId == null) return Results.Challenge();
+
+    var sahip = await userManager.FindByIdAsync(sahipId);
+    if (sahip?.FirmaLogoVerisi == null || sahip.FirmaLogoIcerikTuru == null) return Results.NotFound();
+
+    return Results.File(sahip.FirmaLogoVerisi, sahip.FirmaLogoIcerikTuru);
 }).RequireAuthorization();
 
 app.Run();

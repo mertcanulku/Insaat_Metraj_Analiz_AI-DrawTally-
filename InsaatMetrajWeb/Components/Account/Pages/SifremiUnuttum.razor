@@ -1,0 +1,67 @@
+@page "/account/sifremi-unuttum"
+@layout Layout.LoginLayout
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using InsaatMetrajWeb.Data
+@using InsaatMetrajWeb.Services
+@attribute [AllowAnonymous]
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SifreSifirlamaServisi SifirlamaServisi
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Şifremi Unuttum</PageTitle>
+
+<div class="account-card">
+    <h1>Şifremi Unuttum</h1>
+    <p>Hesabına kayıtlı e-posta adresini gir, sana bir sıfırlama kodu gönderelim.</p>
+
+    <EditForm Model="Input" method="post" OnValidSubmit="KodIste" FormName="sifremi-unuttum">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="account-error" role="alert" />
+
+        <div class="form-group">
+            <label for="email">E-posta</label>
+            <InputText @bind-Value="Input.Email" id="email" class="form-control" autocomplete="username" autofocus placeholder="ad@ornek.com" />
+            <ValidationMessage For="() => Input.Email" class="field-error" />
+        </div>
+
+        <button type="submit" class="btn-primary">Sıfırlama Kodu Gönder</button>
+    </EditForm>
+
+    <p class="account-footer">
+        Şifreni hatırladın mı? <a href="account/giris">Giriş yap</a>
+    </p>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    private async Task KodIste()
+    {
+        var kullanici = await UserManager.FindByEmailAsync(Input.Email);
+        if (kullanici == null)
+        {
+            // Hesap var mı yok mu bilgisini sızdırmamak için başarılıymış gibi devam ediyoruz.
+            RedirectManager.RedirectTo($"account/sifre-sifirla?email={Uri.EscapeDataString(Input.Email)}");
+            return;
+        }
+
+        var gosterimKodu = await SifirlamaServisi.KodGonder(kullanici);
+
+        var yol = $"account/sifre-sifirla?email={Uri.EscapeDataString(Input.Email)}";
+        if (!string.IsNullOrEmpty(gosterimKodu))
+        {
+            yol += $"&gosterimKodu={gosterimKodu}";
+        }
+        RedirectManager.RedirectTo(yol);
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "E-posta gerekli.")]
+        [EmailAddress(ErrorMessage = "Geçerli bir e-posta girin.")]
+        public string Email { get; set; } = "";
+    }
+}

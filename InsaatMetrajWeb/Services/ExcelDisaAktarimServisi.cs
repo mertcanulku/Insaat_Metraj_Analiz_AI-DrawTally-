@@ -14,7 +14,12 @@ public static class ExcelDisaAktarimServisi
     /// bu yüzden aynı marka renkleriyle stilize edilmiş bir metin bandı kullanılıyor). Kullanıcı bunu
     /// dışa aktarmadan önce bir onay kutusuyla açıp kapatabiliyor (bkz. ProjeDetay.razor / Home.razor).
     /// </param>
-    public static byte[] ProjeyiXlsxOlarakOlustur(Proje proje, bool logoBasligiEkle = true)
+    /// <param name="firmaLogosu">
+    /// Kullanıcının Profil sayfasında yüklediği firma logosu (PNG/JPEG bayt dizisi). Doluysa marka
+    /// bandının sağ üst köşesine gerçek bir resim olarak eklenir — <paramref name="logoBasligiEkle"/>
+    /// false olsa bile gösterilir, çünkü bu artık DrawTally'nin değil kullanıcının kendi markası.
+    /// </param>
+    public static byte[] ProjeyiXlsxOlarakOlustur(Proje proje, bool logoBasligiEkle = true, byte[]? firmaLogosu = null)
     {
         using var workbook = new XLWorkbook();
         var sayfa = workbook.Worksheets.Add("Keşif Özeti");
@@ -23,6 +28,11 @@ public static class ExcelDisaAktarimServisi
         if (logoBasligiEkle)
         {
             baslikSatiri = MarkaBasligiEkle(sayfa, proje.Ad);
+        }
+
+        if (firmaLogosu is { Length: > 0 })
+        {
+            FirmaLogosuEkle(sayfa, firmaLogosu, baslikSatiri);
         }
 
         string[] basliklar = { "Disiplin", "Poz Kodu", "Poz Adı", "Ölçüm Detayı", "Birim", "Miktar", "Birim Fiyat", "Tutar" };
@@ -76,8 +86,8 @@ public static class ExcelDisaAktarimServisi
         markaSatiri.Value = "DrawTally  ·  by Drongos Global";
         markaSatiri.Style.Font.Bold = true;
         markaSatiri.Style.Font.FontSize = 13;
-        markaSatiri.Style.Font.FontColor = XLColor.FromHtml("#F97316");
-        markaSatiri.Style.Fill.BackgroundColor = XLColor.FromHtml("#0B1220");
+        markaSatiri.Style.Font.FontColor = XLColor.FromHtml("#5AA9DE");
+        markaSatiri.Style.Fill.BackgroundColor = XLColor.FromHtml("#14181A");
         markaSatiri.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
         markaSatiri.Style.Alignment.Indent = 1;
         sayfa.Row(1).Height = 24;
@@ -86,12 +96,21 @@ public static class ExcelDisaAktarimServisi
         projeSatiri.Value = $"{projeAdi} — Keşif Özeti";
         projeSatiri.Style.Font.Bold = true;
         projeSatiri.Style.Font.FontSize = 11;
-        projeSatiri.Style.Font.FontColor = XLColor.FromHtml("#F1F5F9");
-        projeSatiri.Style.Fill.BackgroundColor = XLColor.FromHtml("#1B2440");
+        projeSatiri.Style.Font.FontColor = XLColor.FromHtml("#F5F5F7");
+        projeSatiri.Style.Fill.BackgroundColor = XLColor.FromHtml("#1C1C1E");
         projeSatiri.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
         projeSatiri.Style.Alignment.Indent = 1;
         sayfa.Row(2).Height = 20;
 
         return 3;
+    }
+
+    /// <summary>Firma logosunu marka bandının sağ üst köşesine, satırlara sığacak şekilde küçültülmüş olarak yerleştirir.</summary>
+    private static void FirmaLogosuEkle(IXLWorksheet sayfa, byte[] logoVerisi, int baslikSatiri)
+    {
+        using var akis = new MemoryStream(logoVerisi);
+        sayfa.AddPicture(akis)
+            .WithSize(90, 30)
+            .MoveTo(sayfa.Cell(Math.Max(baslikSatiri, 1), SutunSayisi));
     }
 }

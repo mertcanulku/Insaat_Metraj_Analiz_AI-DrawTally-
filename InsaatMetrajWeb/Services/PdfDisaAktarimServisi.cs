@@ -12,11 +12,15 @@ namespace InsaatMetrajWeb.Services;
 /// </summary>
 public static class PdfDisaAktarimServisi
 {
-    private static readonly string KoyuZemin = "#0B1220";
-    private static readonly string Vurgu = "#F97316";
+    private static readonly string KoyuZemin = "#14181A";
+    private static readonly string Vurgu = "#5AA9DE";
     private static readonly string TabloBasligi = "#1F2937";
 
-    public static byte[] ProjeyiPdfOlarakOlustur(Proje proje)
+    /// <param name="firmaLogosu">
+    /// Kullanıcının Profil sayfasında yüklediği firma logosu (PNG/JPEG bayt dizisi). Doluysa
+    /// başlık bandının sağına, DrawTally markasının yanına eklenir.
+    /// </param>
+    public static byte[] ProjeyiPdfOlarakOlustur(Proje proje, byte[]? firmaLogosu = null)
     {
         var belge = Document.Create(container =>
         {
@@ -31,6 +35,10 @@ public static class PdfDisaAktarimServisi
                     baslik.Item().Background(KoyuZemin).Padding(10).Row(satir =>
                     {
                         satir.RelativeItem().Text("DrawTally").FontSize(16).Bold().FontColor(Vurgu);
+                        if (firmaLogosu is { Length: > 0 })
+                        {
+                            satir.ConstantItem(70).Height(28).Image(firmaLogosu).FitArea();
+                        }
                         satir.RelativeItem().AlignRight().Text("by Drongos Global").FontSize(9).FontColor("#97A3BF");
                     });
                     baslik.Item().PaddingTop(10).Text(proje.Ad).FontSize(15).Bold();

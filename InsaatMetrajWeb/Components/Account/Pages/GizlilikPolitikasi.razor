@@ -1,0 +1,77 @@
+@page "/account/gizlilik"
+@layout Layout.LoginLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>Gizlilik Politikası</PageTitle>
+
+<div class="account-card account-card-wide">
+    <h1>Gizlilik Politikası</h1>
+
+    <p><em>Son güncelleme: @DateTime.UtcNow.ToString("dd.MM.yyyy")</em></p>
+
+    <p>
+        Bu metin, DrawTally'i ("Uygulama") kullanırken hangi verilerin toplandığını, nasıl
+        işlendiğini ve hangi üçüncü taraflarla paylaşıldığını açıklar. Küçük ölçekli/dahili kullanım
+        için hazırlanmış genel bir taslaktır — kurumsal kullanım için hukuki danışmanlıkla gözden
+        geçirilmesi önerilir.
+    </p>
+
+    <h3>1. Hangi verileri topluyoruz</h3>
+    <p>
+        Hesap oluştururken e-posta adresini ve şifreni (hash'lenmiş olarak) topluyoruz. İsteğe bağlı
+        olarak firma adı, firma telefonu, yetkili kişi bilgileri, fatura/vergi bilgileri ve firma
+        logonu ekleyebilirsin. Oluşturduğun projeler, metraj kalemleri ve içe aktardığın çizim/keşif
+        dosyaları (CSV, PDF, DWG, DXF) hesabınla ilişkilendirilerek saklanır.
+    </p>
+
+    <h3>2. Yapay zeka ile işleme</h3>
+    <p>
+        Yüklediğin PDF ve DWG/DXF çizimlerindeki oda adları, katman bilgileri ve geometrik veriler
+        (alan/m²), sana poz ve maliyet önerisi sunabilmek için bir yapay zeka sağlayıcısına
+        gönderilir. Kullanılan sağlayıcı sunucu yapılandırmasına göre değişir (Anthropic Claude,
+        Google Gemini, Groq veya Nvidia NIM olabilir). Bu öneriler sen onaylamadan projene
+        eklenmez — <a href="/#guven">bkz. Yapay Zeka Şeffaflığı</a>.
+    </p>
+
+    <h3>3. Üçüncü taraflarla paylaşım</h3>
+    <p>
+        Verilerini pazarlama amacıyla hiçbir üçüncü tarafa satmıyor veya kiralamıyoruz. Uygulamanın
+        çalışması için aşağıdaki üçüncü taraf hizmet sağlayıcılarla sınırlı veri paylaşılır:
+    </p>
+    <ul>
+        <li><strong>Yapay zeka sağlayıcısı</strong> — çizim analizi ve poz önerisi için (bkz. madde 2).</li>
+        <li><strong>E-posta gönderim sağlayıcısı (SMTP)</strong> — e-posta doğrulama ve şifre sıfırlama kodların, hesabında kayıtlı e-posta adresine bu kanaldan gönderilir.</li>
+        <li><strong>Google</strong> — "Google ile giriş" seçeneğini kullanırsan, kimlik doğrulama için.</li>
+    </ul>
+
+    <h3>4. Veri saklama ve silme</h3>
+    <p>
+        Verilerin hesabın aktif olduğu sürece saklanır. Profil sayfandan istediğin zaman hesabını ve
+        hesabına bağlı tüm projeleri, metraj kalemlerini ve yüklediğin firma logosunu kalıcı olarak
+        silebilirsin — bu işlem geri alınamaz. Dosyalar yalnızca veritabanımızda saklanır, herkese
+        açık bir depolama alanında (public bucket) tutulmaz.
+    </p>
+
+    <h3>5. Çerezler ve yerel depolama</h3>
+    <p>
+        Oturumunu açık tutmak için zorunlu bir kimlik doğrulama çerezi kullanılır. Açık/koyu tema
+        tercihin tarayıcının yerel depolamasında (localStorage) tutulur — bu bilgi sunucuya
+        gönderilmez. Reklam veya izleme amaçlı çerez kullanmıyoruz.
+    </p>
+
+    <h3>6. Haklarınız</h3>
+    <p>
+        Verilerine erişme, düzeltme ve silme hakkına sahipsin. Silme talebini Profil sayfandaki
+        "Hesabı Sil" seçeneğinden anında uygulayabilir, ya da hesabındaki yetkili e-posta üzerinden
+        bizimle iletişime geçebilirsin.
+    </p>
+
+    <h3>7. Değişiklikler</h3>
+    <p>
+        Bu politika zaman zaman güncellenebilir. Önemli değişikliklerde kullanıcılar bilgilendirilir.
+    </p>
+
+    <p class="account-footer">
+        <a href="account/kosullar">Kullanım Koşulları</a> · <a href="account/kayit">Kayıt sayfasına dön</a>
+    </p>
+</div>

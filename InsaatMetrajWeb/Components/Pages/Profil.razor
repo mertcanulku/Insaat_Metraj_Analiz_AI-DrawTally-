@@ -2,15 +2,17 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Identity
 @inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
 @inject AuthenticationStateProvider AuthProvider
 @inject IdentityRedirectManager RedirectManager
 
 <h1>Profil</h1>
 
-<div class="account-card account-card-wide">
-    <h3>Üyelik Planı</h3>
+<details class="account-card account-card-wide" open>
+    <summary>Üyelik Planı</summary>
     <p>
         Şu an <strong>@UyelikServisi.PlanAdi(kullanici?.EtkinPlan ?? UyelikPlani.Starter)</strong> planındasın.
         @if (denemeGunKaldi.HasValue)
@@ -56,10 +58,49 @@
     <p class="uyelik-not">
         <Icon Name="shield" /> Ödeme entegrasyonu henüz eklenmedi — plan değişimi şimdilik buradan anında ve ücretsiz uygulanır.
     </p>
-</div>
+</details>
 
-<div class="account-card account-card-wide">
-    <h3>Hesap Bilgileri</h3>
+<details class="account-card account-card-wide">
+    <summary>Firma Logosu</summary>
+    <p class="uyelik-not"><Icon Name="shield" /> Yüklersen Excel ve PDF keşif özeti dışa aktarımlarında DrawTally markasının yanında gösterilir.</p>
+
+    @if (!string.IsNullOrEmpty(logoMesaji))
+    {
+        <div class="uyelik-banner"><Icon Name="check" /> @logoMesaji</div>
+    }
+    @if (!string.IsNullOrEmpty(logoHatasi))
+    {
+        <p class="account-error">@logoHatasi</p>
+    }
+
+    <div class="logo-yukleme">
+        @if (kullanici?.FirmaLogoVerisi is { Length: > 0 })
+        {
+            <div class="logo-onizleme">
+                <img src="@($"profil/logo?t={logoOnizlemeDamgasi}")" alt="Firma logosu" />
+            </div>
+            <div class="logo-yukleme-aksiyonlar">
+                <InputFile OnChange="LogoYuklendi" accept="image/png,image/jpeg" class="logo-yukleme-input" id="logo-yukleme-input" />
+                <label for="logo-yukleme-input" class="btn-secondary logo-yukleme-buton">Değiştir</label>
+                <button type="button" class="btn-danger" @onclick="LogoKaldir">Kaldır</button>
+            </div>
+        }
+        else
+        {
+            <div class="logo-yukleme-alan">
+                <InputFile OnChange="LogoYuklendi" accept="image/png,image/jpeg" class="logo-yukleme-input" id="logo-yukleme-input" />
+                <label for="logo-yukleme-input" class="logo-yukleme-etiket">
+                    <Icon Name="upload-cloud" Size="22" />
+                    <span>PNG veya JPEG yükle</span>
+                    <span class="yardim-metni">en fazla 2 MB</span>
+                </label>
+            </div>
+        }
+    </div>
+</details>
+
+<details class="account-card account-card-wide">
+    <summary>Hesap Bilgileri</summary>
     <p class="uyelik-not"><Icon Name="shield" /> E-posta: <strong>@kullanici?.Email</strong></p>
 
     @if (!string.IsNullOrEmpty(profilMesaji))
@@ -127,10 +168,10 @@
 
         <button type="submit" class="btn-primary">Bilgileri Kaydet</button>
     </EditForm>
-</div>
+</details>
 
-<div class="account-card account-card-wide">
-    <h3>Şifre Değiştir</h3>
+<details class="account-card account-card-wide">
+    <summary>Şifre Değiştir</summary>
     <p class="uyelik-not"><Icon Name="shield" /> Şifreni değiştirdikten sonra güvenlik nedeniyle tekrar giriş yapman istenecek.</p>
 
     @if (!string.IsNullOrEmpty(sifreHatasi))
@@ -160,14 +201,40 @@
 
         <button type="submit" class="btn-primary">Şifreyi Güncelle</button>
     </EditForm>
-</div>
+</details>
+
+<details class="account-card account-card-wide account-card-danger">
+    <summary>Hesabı Sil</summary>
+    <p class="uyelik-not"><Icon Name="warning" /> Bu işlem geri alınamaz: hesabın, tüm projelerin, metraj kalemlerin ve firma logon kalıcı olarak silinir.</p>
+
+    @if (!string.IsNullOrEmpty(silmeHatasi))
+    {
+        <p class="account-error">@silmeHatasi</p>
+    }
+
+    <div class="form-check">
+        <label>
+            <InputCheckbox @bind-Value="hesapSilmeOnayi" />
+            Evet, hesabımı ve tüm verilerimi kalıcı olarak silmek istiyorum
+        </label>
+    </div>
+
+    <button type="button" class="btn-danger" disabled="@(!hesapSilmeOnayi)" @onclick="HesabiSil">Hesabı Kalıcı Olarak Sil</button>
+</details>
 
 @code {
+    private const long LogoAzamiBoyut = 2 * 1024 * 1024;
+
     private ApplicationUser? kullanici;
     private string? profilMesaji;
     private string? planMesaji;
     private string? sifreHatasi;
+    private string? logoMesaji;
+    private string? logoHatasi;
+    private string logoOnizlemeDamgasi = DateTime.UtcNow.Ticks.ToString();
     private int? denemeGunKaldi;
+    private bool hesapSilmeOnayi;
+    private string? silmeHatasi;
 
     private ProfilInputModel ProfilInput { get; set; } = new();
     private SifreInputModel SifreInput { get; set; } = new();
@@ -282,6 +349,70 @@
         {
             sifreHatasi = string.Join(" ", result.Errors.Select(e => e.Description));
         }
+    }
+
+    private async Task LogoYuklendi(InputFileChangeEventArgs e)
+    {
+        logoMesaji = null;
+        logoHatasi = null;
+
+        if (kullanici == null) return;
+
+        var dosya = e.File;
+        if (dosya.ContentType != "image/png" && dosya.ContentType != "image/jpeg")
+        {
+            logoHatasi = "Yalnızca PNG veya JPEG dosyası yükleyebilirsin.";
+            return;
+        }
+        if (dosya.Size > LogoAzamiBoyut)
+        {
+            logoHatasi = "Logo en fazla 2 MB olabilir.";
+            return;
+        }
+
+        using var akis = new MemoryStream();
+        await dosya.OpenReadStream(LogoAzamiBoyut).CopyToAsync(akis);
+
+        kullanici.FirmaLogoVerisi = akis.ToArray();
+        kullanici.FirmaLogoIcerikTuru = dosya.ContentType;
+        var result = await UserManager.UpdateAsync(kullanici);
+
+        if (result.Succeeded)
+        {
+            logoOnizlemeDamgasi = DateTime.UtcNow.Ticks.ToString();
+            logoMesaji = "Firma logon güncellendi.";
+        }
+        else
+        {
+            logoHatasi = string.Join(" ", result.Errors.Select(err => err.Description));
+        }
+    }
+
+    private async Task LogoKaldir()
+    {
+        if (kullanici == null) return;
+
+        kullanici.FirmaLogoVerisi = null;
+        kullanici.FirmaLogoIcerikTuru = null;
+        await UserManager.UpdateAsync(kullanici);
+        logoMesaji = "Firma logon kaldırıldı.";
+        logoHatasi = null;
+    }
+
+    private async Task HesabiSil()
+    {
+        if (kullanici == null || !hesapSilmeOnayi) return;
+
+        var result = await UserManager.DeleteAsync(kullanici);
+        if (!result.Succeeded)
+        {
+            silmeHatasi = string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+
+        // Şifre değiştirmede olduğu gibi, interaktif devre içinden oturum çerezini burada güvenle
+        // temizleyemiyoruz — gerçek bir HTTP isteğiyle çalışan Logout sayfasına yönlendiriyoruz.
+        RedirectManager.RedirectTo("account/cikis", new Dictionary<string, object?> { ["ReturnUrl"] = "/" });
     }
 
     private sealed class ProfilInputModel : IValidatableObject

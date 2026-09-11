@@ -4,14 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#F6F7FA" />
+    <meta name="theme-color" content="#FAFAFA" />
     <title>DrawTally — İnşaat Metraj ve Hakediş Programı</title>
     <base href="/" />
     <link rel="icon" type="image/svg+xml" href="images/brand/drawtally-icon-only.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="app.css" />
+    <!-- Gövde/başlık fontu sistem fontu (-apple-system vb.); IBM Plex Mono yalnızca
+         rakamlar ve poz kodları gibi tablo verisi için yükleniyor. -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="app.css?v=20260911e" />
     <!-- Sayfa boyanmadan önce senkron çalışır: tema tercihi (localStorage veya sistem)
          data-theme olarak <html>'e uygulanır, koyu/açık "flaş" oluşmaz. -->
     <script src="js/theme.js"></script>
@@ -19,7 +21,18 @@
 </head>
 <body>
     <Routes />
+
+    <div id="cerez-bildirimi" class="cerez-bildirimi" hidden>
+        <p>
+            Bu site, oturumunu açık tutmak için zorunlu bir kimlik doğrulama çerezi kullanır.
+            Reklam veya izleme amaçlı çerez kullanılmaz. Detaylar için
+            <a href="account/gizlilik">Gizlilik Politikası</a>.
+        </p>
+        <button type="button" id="cerez-bildirimi-kapat">Anladım</button>
+    </div>
+
     <script src="_framework/blazor.web.js"></script>
     <script src="js/dropzone.js"></script>
+    <script src="js/cerez.js?v=20260911e"></script>
 </body>
 </html>

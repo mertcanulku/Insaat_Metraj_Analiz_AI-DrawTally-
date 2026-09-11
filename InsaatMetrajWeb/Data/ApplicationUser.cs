@@ -52,4 +52,17 @@ public class ApplicationUser : IdentityUser
     /// <summary>Kurumsal hesapta Vergi Kimlik No (10 hane), bireysel hesapta TC Kimlik No (11 hane).</summary>
     public string? VergiKimlikNo { get; set; }
     public string? FaturaAdresi { get; set; }
+
+    /// <summary>
+    /// İsteğe bağlı firma logosu (PNG/JPEG). Yüklenirse Excel ve PDF keşif özeti dışa
+    /// aktarımlarında DrawTally markasının yanında gösterilir — bkz. Profil.razor (yükleme UI'ı),
+    /// Program.cs'teki "/profil/logo" uç noktası (önizleme) ve ExcelDisaAktarimServisi/PdfDisaAktarimServisi.
+    /// </summary>
+    public byte[]? FirmaLogoVerisi { get; set; }
+    public string? FirmaLogoIcerikTuru { get; set; }
+
+    /// <summary>"Şifremi unuttum" akışında üretilen 6 haneli kod (bkz. SifreSifirlamaServisi). E-posta
+    /// doğrulama koduyla (<see cref="DogrulamaKodu"/>) karışmaması için ayrı bir alan.</summary>
+    public string? SifreSifirlamaKodu { get; set; }
+    public DateTime? SifreSifirlamaKoduSonGecerlilik { get; set; }
 }

@@ -1,0 +1,127 @@
+@page "/account/sifre-sifirla"
+@layout Layout.LoginLayout
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using InsaatMetrajWeb.Data
+@using InsaatMetrajWeb.Services
+@attribute [AllowAnonymous]
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SifreSifirlamaServisi SifirlamaServisi
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Şifre Sıfırla</PageTitle>
+
+<div class="account-card">
+    <h1>Şifre Sıfırla</h1>
+
+    @if (string.IsNullOrEmpty(Email))
+    {
+        <p class="account-error">E-posta adresi belirtilmedi. <a href="account/sifremi-unuttum">Baştan başla</a>.</p>
+    }
+    else
+    {
+        <p>
+            <strong>@Email</strong> adresine gönderilen 6 haneli kodu ve yeni şifreni gir.
+        </p>
+
+        @if (!string.IsNullOrEmpty(GosterimKodu))
+        {
+            <p class="account-error">
+                SMTP yapılandırılmadığı için kod şu an e-posta yerine burada gösteriliyor (geliştirme modu):
+                <strong>@GosterimKodu</strong>
+            </p>
+        }
+
+        <StatusMessage Message="@mesaj" />
+
+        <EditForm Model="Input" method="post" OnValidSubmit="SifreyiSifirla" FormName="sifre-sifirla">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="account-error" role="alert" />
+
+            <div class="form-group">
+                <label for="kod">Sıfırlama Kodu</label>
+                <InputText @bind-Value="Input.Kod" id="kod" class="form-control" autocomplete="one-time-code" autofocus placeholder="123456" />
+                <ValidationMessage For="() => Input.Kod" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="yeniSifre">Yeni Şifre</label>
+                <InputText type="password" @bind-Value="Input.YeniSifre" id="yeniSifre" class="form-control" autocomplete="new-password" placeholder="en az 6 karakter" />
+                <ValidationMessage For="() => Input.YeniSifre" class="field-error" />
+            </div>
+            <div class="form-group">
+                <label for="yeniSifreTekrar">Yeni Şifre (tekrar)</label>
+                <InputText type="password" @bind-Value="Input.YeniSifreTekrar" id="yeniSifreTekrar" class="form-control" autocomplete="new-password" placeholder="şifreyi tekrar yazın" />
+                <ValidationMessage For="() => Input.YeniSifreTekrar" class="field-error" />
+            </div>
+
+            <button type="submit" class="btn-primary">Şifreyi Sıfırla</button>
+        </EditForm>
+
+        <EditForm Model="this" method="post" OnSubmit="KoduTekrarGonder" FormName="yeniden-gonder">
+            <button type="submit" class="btn-secondary-link">Kodu tekrar gönder</button>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? GosterimKodu { get; set; }
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    private string? mesaj;
+
+    private async Task SifreyiSifirla()
+    {
+        var kullanici = await UserManager.FindByEmailAsync(Email ?? "");
+        if (kullanici == null)
+        {
+            mesaj = "Girdiğiniz kod hatalı.";
+            return;
+        }
+
+        var (basarili, sonucMesaji) = await SifirlamaServisi.KoduDogrulaVeSifreyiSifirla(kullanici, Input.Kod, Input.YeniSifre);
+        if (!basarili)
+        {
+            mesaj = sonucMesaji;
+            return;
+        }
+
+        RedirectManager.RedirectTo("account/giris?sifreGuncellendi=true");
+    }
+
+    private async Task KoduTekrarGonder()
+    {
+        var kullanici = await UserManager.FindByEmailAsync(Email ?? "");
+        if (kullanici == null) return;
+
+        var yeniGosterimKodu = await SifirlamaServisi.KodGonder(kullanici);
+
+        var yol = $"account/sifre-sifirla?email={Uri.EscapeDataString(Email ?? "")}";
+        if (!string.IsNullOrEmpty(yeniGosterimKodu))
+        {
+            yol += $"&gosterimKodu={yeniGosterimKodu}";
+        }
+        RedirectManager.RedirectTo(yol);
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Kod gerekli.")]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "Kod 6 haneli olmalı.")]
+        public string Kod { get; set; } = "";
+
+        [Required(ErrorMessage = "Yeni şifre gerekli.")]
+        [StringLength(100, ErrorMessage = "{0} en az {2} karakter olmalı.", MinimumLength = 6)]
+        public string YeniSifre { get; set; } = "";
+
+        [Required(ErrorMessage = "Yeni şifre tekrarı gerekli.")]
+        [Compare(nameof(YeniSifre), ErrorMessage = "Şifreler eşleşmiyor.")]
+        public string YeniSifreTekrar { get; set; } = "";
+    }
+}
