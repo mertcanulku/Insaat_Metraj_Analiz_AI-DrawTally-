@@ -180,6 +180,15 @@ a { color: var(--brand); }
 .brand-sub { font-size: 0.68rem; color: var(--ink-faint); }
 
 .nav-links { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.nav-group-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-faint);
+    padding: 14px 12px 4px;
+}
+.nav-group-label:first-child { padding-top: 0; }
 .nav-links a {
     display: flex;
     align-items: center;
@@ -245,6 +254,7 @@ a { color: var(--brand); }
            yatayda genişletmesin. */
     }
     .nav-links a { padding: 8px 10px; white-space: nowrap; }
+    .nav-group-label { display: none; }
     .sidebar-foot { display: none; }
     .kullanici-menu-email { display: none; }
     .content { padding: 22px 18px; }
@@ -602,6 +612,33 @@ ul li { margin-bottom: 6px; }
 
 .uyelik-sinir-uyari a { margin-top: 4px; font-weight: 500; }
 
+/* --- Hakediş ilerleme özeti (Keşif Özeti üstü) --- */
+.ilerleme-ozet {
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin: 4px 0 20px;
+}
+.ilerleme-ozet-baslik {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+}
+.ilerleme-ozet-baslik strong { font-family: "IBM Plex Mono", monospace; font-size: 1rem; color: var(--ink); }
+.ilerleme-cubuk {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--line-soft);
+    overflow: hidden;
+}
+.ilerleme-cubuk-dolu { height: 100%; background: var(--brand); border-radius: 999px; }
+.ilerleme-ozet-detay { display: block; margin-top: 8px; font-size: 0.78rem; color: var(--ink-faint); }
+
 .uyelik-plan-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -841,7 +878,7 @@ details.account-card-wide[open] summary { margin-bottom: 18px; }
    (ör. üyelik deneme banner'ındaki "Planları gör" linkiyle) çakışıyordu hem de dar ekranlarda
    kenar çubuğu taştığında layout viewport genişleyip menüyü ekran dışına itiyordu. Artık normal
    akışta, sheet'in hemen üstünde sağa yaslı duruyor. */
-.content-topbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+.content-topbar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-bottom: 14px; }
 .kullanici-menu { position: relative; }
 .kullanici-menu-tetikleyici {
     display: flex;
@@ -864,6 +901,20 @@ details.account-card-wide[open] summary { margin-bottom: 18px; }
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.kullanici-menu-kredi {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--brand);
+    background: var(--brand-soft);
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+.kullanici-menu-kredi .icon { color: var(--brand); }
 .kullanici-menu-acilir {
     display: none;
     flex-direction: column;

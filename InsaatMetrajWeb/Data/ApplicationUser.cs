@@ -65,4 +65,15 @@ public class ApplicationUser : IdentityUser
     /// doğrulama koduyla (<see cref="DogrulamaKodu"/>) karışmaması için ayrı bir alan.</summary>
     public string? SifreSifirlamaKodu { get; set; }
     public DateTime? SifreSifirlamaKoduSonGecerlilik { get; set; }
+
+    /// <summary>
+    /// Bu ay için kalan hakediş oluşturma kredisi — her yeni hakediş (dönem) oluşturma, projenin
+    /// alanına göre hesaplanan bir miktar kredi harcar (bkz. UyelikServisi.HakedisKrediMaliyeti).
+    /// Düzenleme/görüntüleme/export kredi harcamaz. Ay değiştiğinde VeriDeposu tarafından tembel
+    /// (lazy) olarak plan limitine sıfırlanır — bkz. VeriDeposu.KrediyiGerekirseYenile.
+    /// </summary>
+    public int KalanHakedisKredisi { get; set; }
+
+    /// <summary>Kredinin en son hangi dönem (yyyyMM, ör. 202609) için yenilendiği — ay değiştiğinde yeniden doldurulur.</summary>
+    public int HakedisKredisiDonemi { get; set; }
 }

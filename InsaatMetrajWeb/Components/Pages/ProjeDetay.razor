@@ -1,8 +1,10 @@
 @page "/proje/{ProjeId:int}"
 @rendermode InteractiveServer
 @attribute [Authorize]
+@using Microsoft.AspNetCore.Identity
 @inject VeriDeposu Veri
 @inject AuthenticationStateProvider AuthProvider
+@inject UserManager<ApplicationUser> UserManager
 
 @if (proje == null)
 {
@@ -16,6 +18,7 @@ else
     <div class="proje-aksiyonlar">
         <a href="@($"proje/{ProjeId}/metraj-giris")"><Icon Name="plus" /> Metraj Girişi</a>
         <a href="@($"proje/{ProjeId}/proje-import")"><Icon Name="plus" /> Import (CSV/PDF/DWG/DXF)</a>
+        <a href="@($"proje/{ProjeId}/hakedis")"><Icon Name="banknote" /> Hakediş</a>
         @if (proje.MetrajKalemleri.Count > 0)
         {
             <a href="@($"proje/{ProjeId}/excel?logo={(excelLogoBasligiEkle ? "true" : "false")}")"><Icon Name="download" /> Excel'e Aktar</a>
@@ -23,12 +26,68 @@ else
         }
     </div>
 
+    <details class="proje-ayarlari">
+        <summary>Proje Ayarları (Hakediş Varsayılanları)</summary>
+        <div class="form-satir">
+            <label>Proje Alanı (m²):</label>
+            <input type="number" step="0.01" @bind="alanM2" />
+        </div>
+        <p class="ipucu">Hakediş oluşturma kredisi bu alana göre hesaplanır (her 100 m² = 1 kredi, en az 1).</p>
+        <div class="form-satir">
+            <label>Sözleşme Bedeli:</label>
+            <input type="number" step="0.01" @bind="sozlesmeBedeli" />
+        </div>
+        <div class="form-satir">
+            <label>Varsayılan Avans Oranı (%):</label>
+            <input type="number" step="0.01" @bind="avansOrani" />
+        </div>
+        <div class="form-satir">
+            <label>Varsayılan Teminat Oranı (%):</label>
+            <input type="number" step="0.01" @bind="teminatOrani" />
+        </div>
+        <div class="form-satir">
+            <label>Varsayılan Stopaj Oranı (%):</label>
+            <input type="number" step="0.01" @bind="stopajOrani" />
+        </div>
+        <div class="form-satir">
+            <label>Varsayılan KDV Oranı (%):</label>
+            <input type="number" step="0.01" @bind="kdvOrani" />
+        </div>
+        <button @onclick="AyarlariKaydet"><Icon Name="check" /> Ayarları Kaydet</button>
+        @if (!string.IsNullOrEmpty(ayarMesaji))
+        {
+            <p class="basarili-mesaj">@ayarMesaji</p>
+        }
+    </details>
+
     @if (proje.MetrajKalemleri.Count > 0)
     {
         <label class="excel-secenek">
             <input type="checkbox" @bind="excelLogoBasligiEkle" />
             Excel'de DrawTally başlığı olsun
         </label>
+    }
+
+    @if (ilerlemeIzinli && sonHakedisYuzdeleri != null)
+    {
+        <div class="ilerleme-ozet">
+            <div class="ilerleme-ozet-baslik">
+                <span><Icon Name="banknote" Size="14" /> İlerleme</span>
+                <strong>%@GenelIlerlemeYuzdesi().ToString("0.#")</strong>
+            </div>
+            <div class="ilerleme-cubuk">
+                <div class="ilerleme-cubuk-dolu" style="width:@(GenelIlerlemeYuzdesi().ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+            </div>
+            <span class="ilerleme-ozet-detay">@ParaFormatlayici.Formatla(GenelIlerlemeTutari()) / @ParaFormatlayici.Formatla(proje.ToplamMaliyet()) tamamlandı (son hakedişe göre)</span>
+        </div>
+    }
+    else if (!ilerlemeIzinli && hakedisVarMi)
+    {
+        <div class="bos-durum uyelik-sinir-uyari">
+            <strong>İlerleme görünümü Pro ve Business planlarında</strong>
+            <span>Keşif Özeti'nde tamamlanan/kalan miktar ve tutarları görmek için planını yükseltebilirsin.</span>
+            <a href="profil">Planları gör</a>
+        </div>
     }
 
     <h3>Keşif Özeti</h3>
@@ -64,6 +123,12 @@ else
                     <th>Miktar</th>
                     <th>Birim Fiyat</th>
                     <th>Tutar</th>
+                    @if (ilerlemeIzinli && sonHakedisYuzdeleri != null)
+                    {
+                        <th>Tamamlanan %</th>
+                        <th>Kalan Miktar</th>
+                        <th>Kalan Tutar</th>
+                    }
                     <th></th>
                 </tr>
             </thead>
@@ -78,6 +143,12 @@ else
                         <td>@k.Miktar.ToString("0.000")</td>
                         <td>@ParaFormatlayici.Formatla(k.Poz.BirimMaliyet())</td>
                         <td>@ParaFormatlayici.Formatla(k.ToplamMaliyet())</td>
+                        @if (ilerlemeIzinli && sonHakedisYuzdeleri != null)
+                        {
+                            <td>%@KalemYuzdesi(k).ToString("0.#")</td>
+                            <td>@((k.Miktar * (100 - KalemYuzdesi(k)) / 100m).ToString("0.000"))</td>
+                            <td>@ParaFormatlayici.Formatla(k.ToplamMaliyet() * (100 - KalemYuzdesi(k)) / 100m)</td>
+                        }
                         <td><button class="btn-danger" @onclick="() => KalemSil(k.Id)"><Icon Name="trash" /> Sil</button></td>
                     </tr>
                 }
@@ -88,12 +159,20 @@ else
                     <tr>
                         <td colspan="6" style="text-align:right"><strong>@DisiplinTespitServisi.GosterimAdi(secilenDisiplin.Value) ARA TOPLAM</strong></td>
                         <td><strong>@ParaFormatlayici.Formatla(GosterilenKalemler().Sum(k => k.ToplamMaliyet()))</strong></td>
+                        @if (ilerlemeIzinli && sonHakedisYuzdeleri != null)
+                        {
+                            <td></td><td></td><td></td>
+                        }
                         <td></td>
                     </tr>
                 }
                 <tr>
                     <td colspan="6" style="text-align:right"><strong><Icon Name="banknote" Size="14" /> GENEL TOPLAM (tüm disiplinler)</strong></td>
                     <td><strong>@ParaFormatlayici.Formatla(proje.ToplamMaliyet())</strong></td>
+                    @if (ilerlemeIzinli && sonHakedisYuzdeleri != null)
+                    {
+                        <td></td><td></td><td></td>
+                    }
                     <td></td>
                 </tr>
             </tfoot>
@@ -110,10 +189,61 @@ else
     private ProjeDisiplini? secilenDisiplin;
     private bool excelLogoBasligiEkle = true;
 
+    private decimal sozlesmeBedeli;
+    private decimal avansOrani;
+    private decimal teminatOrani;
+    private decimal stopajOrani;
+    private decimal kdvOrani;
+    private decimal alanM2;
+    private string ayarMesaji = "";
+
+    private bool ilerlemeIzinli;
+    private bool hakedisVarMi;
+    private Dictionary<int, decimal>? sonHakedisYuzdeleri;
+
     protected override async Task OnParametersSetAsync()
     {
         var sahipId = await AuthProvider.GetUserIdAsync();
         proje = await Veri.ProjeBul(sahipId, ProjeId);
+        if (proje != null)
+        {
+            sozlesmeBedeli = proje.SozlesmeBedeli;
+            avansOrani = proje.VarsayilanAvansOrani;
+            teminatOrani = proje.VarsayilanTeminatOrani;
+            stopajOrani = proje.VarsayilanStopajOrani;
+            kdvOrani = proje.VarsayilanKdvOrani;
+            alanM2 = proje.AlanM2;
+
+            var kullanici = await UserManager.FindByIdAsync(sahipId);
+            ilerlemeIzinli = kullanici != null && UyelikServisi.IlerlemeGorunumuIzinli(kullanici.EtkinPlan);
+
+            if (ilerlemeIzinli)
+            {
+                sonHakedisYuzdeleri = await Veri.SonHakedisKalemYuzdeleri(sahipId, ProjeId);
+            }
+            else
+            {
+                hakedisVarMi = await Veri.HakedisVarMi(sahipId, ProjeId);
+            }
+        }
+    }
+
+    private decimal KalemYuzdesi(MetrajKalemi k) =>
+        sonHakedisYuzdeleri != null && sonHakedisYuzdeleri.TryGetValue(k.Id, out var yuzde) ? yuzde : 0;
+
+    private decimal GenelIlerlemeTutari() =>
+        proje!.MetrajKalemleri.Sum(k => k.ToplamMaliyet() * KalemYuzdesi(k) / 100m);
+
+    private decimal GenelIlerlemeYuzdesi() =>
+        proje!.ToplamMaliyet() == 0 ? 0 : GenelIlerlemeTutari() / proje.ToplamMaliyet() * 100m;
+
+    private async Task AyarlariKaydet()
+    {
+        if (proje == null) return;
+        var sahipId = await AuthProvider.GetUserIdAsync();
+        await Veri.ProjeAyarlariGuncelle(sahipId, ProjeId, sozlesmeBedeli, avansOrani, teminatOrani, stopajOrani, kdvOrani, alanM2);
+        proje = await Veri.ProjeBul(sahipId, ProjeId);
+        ayarMesaji = "Ayarlar kaydedildi.";
     }
 
     private List<MetrajKalemi> GosterilenKalemler() =>

@@ -249,12 +249,30 @@
                     <h3>@T("Maliyet Analizi", "Cost Analysis")</h3>
                     <p>@T("Resmi ÇŞB birim fiyat cetvellerine dayalı, güncel ve denetlenebilir maliyet hesaplaması.", "Up-to-date, auditable cost calculation based on official government unit price schedules.")</p>
                 </div>
-                <div class="landing-bento-tile">
-                    <Icon Name="file-text" Size="22" CssClass="landing-bento-icon" />
-                    <h3>@T("Proje ve Hakediş Yönetimi", "Project & Progress Payment Management")</h3>
-                    <p>@T("İlerlemeyi takip et, hakediş dönemlerini yönet, tüm proje geçmişini tek yerde tut.", "Track progress, manage progress payment (hakediş) periods, keep the full project history in one place.")</p>
-                </div>
                 <div class="landing-bento-tile landing-bento-tile-wide">
+                    <Icon Name="banknote" Size="22" CssClass="landing-bento-icon" />
+                    <h3>@T("Hakediş Yönetimi", "Progress Payment (Hakediş) Management")</h3>
+                    <p>@T("Her dönem kümülatif tamamlanma yüzdesini gir; sistem bu dönem imalatı, avans mahsubu, teminat/stopaj kesintileri, KDV ve net ödenecek tutarı otomatik hesaplar, Excel/PDF olarak dışa aktarır.", "Enter each period's cumulative completion percentage; the system auto-calculates this period's output, advance offset, retention/withholding deductions, VAT and the net payable amount, and exports it to Excel/PDF.")</p>
+                    <div class="landing-analysis-card">
+                        <div class="landing-analysis-row">
+                            <span class="landing-analysis-label">@T("Kümülatif Tamamlanma", "Cumulative Completion")</span>
+                            <strong>%30 → %50</strong>
+                        </div>
+                        <div class="landing-analysis-row">
+                            <span class="landing-analysis-label">@T("Bu Dönem İmalat", "This Period's Output")</span>
+                            <strong>₺7.680,00</strong>
+                        </div>
+                        <div class="landing-analysis-row">
+                            <span class="landing-analysis-label">@T("Kesintiler (Teminat/Stopaj/Avans)", "Deductions (Retention/Withholding/Advance)")</span>
+                            <strong>-₺1.305,60</strong>
+                        </div>
+                        <div class="landing-analysis-confidence">
+                            <span class="landing-badge landing-badge-ok"><Icon Name="check" Size="12" /> @T("Net Ödenecek", "Net Payable")</span>
+                            <span class="landing-analysis-model">₺7.910,40</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="landing-bento-tile">
                     <Icon Name="grid" Size="22" CssClass="landing-bento-icon" />
                     <h3>@T("Çoklu Proje Panosu", "Multi-Project Dashboard")</h3>
                     <p>@T("Tüm projelerini, toplam metraj kalemi sayısını ve toplam keşif bedelini tek bir panodan izle.", "Monitor every project, total takeoff item count and total estimated cost from a single dashboard.")</p>

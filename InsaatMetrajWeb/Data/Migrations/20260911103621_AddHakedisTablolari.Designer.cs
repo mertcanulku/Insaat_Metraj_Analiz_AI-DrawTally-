@@ -3,6 +3,7 @@ using System;
 using InsaatMetrajWeb.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace InsaatMetrajWeb.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911103621_AddHakedisTablolari")]
+    partial class AddHakedisTablolari
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
@@ -82,12 +85,6 @@ namespace InsaatMetrajWeb.Data.Migrations
 
                     b.Property<string>("FirmaTelefonu")
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("HakedisKredisiDonemi")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("KalanHakedisKredisi")
-                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("KurumsalHesap")
                         .HasColumnType("INTEGER");
@@ -334,9 +331,6 @@ namespace InsaatMetrajWeb.Data.Migrations
 
                     b.Property<string>("Ad")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("AlanM2")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("SahipId")

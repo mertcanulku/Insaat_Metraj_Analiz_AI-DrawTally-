@@ -1,0 +1,83 @@
+@page "/proje/{ProjeId:int}/hakedis"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject VeriDeposu Veri
+@inject AuthenticationStateProvider AuthProvider
+
+@if (proje == null)
+{
+    <p class="hata-mesaj">Proje bulunamadı (id: @ProjeId). <a href="/">Proje listesine dön</a></p>
+}
+else
+{
+    <p><a href="@($"/proje/{ProjeId}")"><Icon Name="arrow-left" /> @proje.Ad</a></p>
+    <h1><Icon Name="banknote" /> Hakedişler</h1>
+
+    <div class="proje-aksiyonlar">
+        <a href="@($"proje/{ProjeId}/hakedis/form")"><Icon Name="plus" /> Yeni Hakediş Oluştur</a>
+    </div>
+
+    <p class="ipucu">
+        Yeni bir hakediş oluşturmak bu projede <strong>@gerekenKredi kredi</strong> harcar — bu ay kalan krediniz: <strong>@kalanKredi</strong>.
+        @if (!krediYetiyor)
+        {
+            <span> Yetersiz kredi — bir sonraki ay yenilenecek, ya da planını yükseltebilirsin (<a href="/profil">Planları gör</a>).</span>
+        }
+    </p>
+
+    @if (hakedisler.Count == 0)
+    {
+        <div class="bos-durum">
+            <strong>Bu projede henüz hakediş yok</strong>
+            <span>Yukarıdaki butonla ilk hakedişi oluşturabilirsin.</span>
+        </div>
+    }
+    else
+    {
+        <div class="veri-tablo-wrap">
+        <table class="veri-tablo">
+            <thead>
+                <tr>
+                    <th>Hakediş No</th>
+                    <th>Tarih</th>
+                    <th>Net Ödenecek Tutar</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var h in hakedisler)
+                {
+                    <tr>
+                        <td>@h.HakedisNo. Hakediş</td>
+                        <td>@h.Tarih.ToString("dd.MM.yyyy")</td>
+                        <td>@ParaFormatlayici.Formatla(h.NetOdenecekTutar)</td>
+                        <td><a href="@($"proje/{ProjeId}/hakedis/{h.Id}")"><Icon Name="file-text" /> Görüntüle</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int ProjeId { get; set; }
+
+    private Proje? proje;
+    private List<HakedisOzeti> hakedisler = new();
+    private int gerekenKredi;
+    private int kalanKredi;
+    private bool krediYetiyor = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var sahipId = await AuthProvider.GetUserIdAsync();
+        proje = await Veri.ProjeBul(sahipId, ProjeId);
+        if (proje != null)
+        {
+            hakedisler = await Veri.HakedisleriListele(sahipId, ProjeId);
+            (gerekenKredi, kalanKredi, krediYetiyor) = await Veri.HakedisKrediDurumu(sahipId, ProjeId);
+        }
+    }
+}

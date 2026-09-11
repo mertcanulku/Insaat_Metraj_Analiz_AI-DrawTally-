@@ -6,6 +6,15 @@ public class Proje
     public string Ad { get; set; } = "";
     public List<MetrajKalemi> MetrajKalemleri { get; set; } = new();
 
+    /// <summary>Hakediş hesaplarında kullanılan sözleşme bedeli ve varsayılan kesinti/avans oranları —
+    /// bkz. Data/ProjeKaydi.cs.</summary>
+    public decimal SozlesmeBedeli { get; set; }
+    public decimal VarsayilanAvansOrani { get; set; }
+    public decimal VarsayilanTeminatOrani { get; set; }
+    public decimal VarsayilanStopajOrani { get; set; }
+    public decimal VarsayilanKdvOrani { get; set; } = 20;
+    public decimal AlanM2 { get; set; }
+
     public decimal ToplamMaliyet() => MetrajKalemleri.Sum(k => k.ToplamMaliyet());
 }
 

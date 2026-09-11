@@ -1,4 +1,7 @@
 @inherits LayoutComponentBase
+@using System.Security.Claims
+@inject VeriDeposu Veri
+@inject AuthenticationStateProvider AuthProvider
 
 <div class="app-shell">
     <nav class="sidebar">
@@ -10,24 +13,33 @@
                     <span class="brand-sub">by Drongos Global</span>
                 </div>
             </a>
-            <ThemeToggle />
         </div>
         <div class="nav-links">
+            <span class="nav-group-label">Keşif ve Metraj</span>
             <NavLink href="projeler" Match="NavLinkMatch.All"><Icon Name="folder" /> Projeler</NavLink>
             <NavLink href="poz-kutuphanesi"><Icon Name="library" /> Poz Kütüphanesi</NavLink>
+
+            <span class="nav-group-label">3D Render</span>
+            <NavLink href="3d-render"><Icon Name="layers" /> 3D Render</NavLink>
         </div>
     </nav>
     <main class="content">
         <div class="content-topbar">
+            <ThemeToggle />
             <AuthorizeView>
                 <Authorized>
                     <div class="kullanici-menu">
                         <button type="button" class="kullanici-menu-tetikleyici">
                             <Icon Name="user" />
                             <span class="kullanici-menu-email">@context.User.Identity?.Name</span>
+                            @if (kalanKredi.HasValue)
+                            {
+                                <span class="kullanici-menu-kredi" title="Kalan hakediş kredisi"><Icon Name="banknote" Size="12" /> @kalanKredi</span>
+                            }
                         </button>
                         <div class="kullanici-menu-acilir">
                             <a href="profil"><Icon Name="star" /> Profil ve Üyelik</a>
+                            <a href="profil"><Icon Name="banknote" /> Kredi Satın Al</a>
                             <a href="account/cikis"><Icon Name="sign-out" /> Çıkış Yap</a>
                         </div>
                     </div>
@@ -39,3 +51,14 @@
         </div>
     </main>
 </div>
+
+@code {
+    private int? kalanKredi;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        var sahipId = state.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        kalanKredi = sahipId != null ? await Veri.KullaniciKalanKredisi(sahipId) : null;
+    }
+}

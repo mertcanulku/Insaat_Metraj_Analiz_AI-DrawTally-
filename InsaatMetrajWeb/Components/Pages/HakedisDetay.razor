@@ -1,0 +1,92 @@
+@page "/proje/{ProjeId:int}/hakedis/{HakedisId:int}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject VeriDeposu Veri
+@inject AuthenticationStateProvider AuthProvider
+
+@if (proje == null)
+{
+    <p class="hata-mesaj">Proje bulunamadı (id: @ProjeId). <a href="/">Proje listesine dön</a></p>
+}
+else if (hakedis == null)
+{
+    <p class="hata-mesaj">Hakediş bulunamadı. <a href="@($"/proje/{ProjeId}/hakedis")">Hakediş listesine dön</a></p>
+}
+else
+{
+    <p><a href="@($"/proje/{ProjeId}/hakedis")"><Icon Name="arrow-left" /> @proje.Ad — Hakedişler</a></p>
+    <h1><Icon Name="banknote" /> @hakedis.HakedisNo. Hakediş — @hakedis.Tarih.ToString("dd.MM.yyyy")</h1>
+
+    <div class="proje-aksiyonlar">
+        <a href="@($"proje/{ProjeId}/hakedis/form/{HakedisId}")"><Icon Name="plus" /> Düzenle</a>
+        <a href="@($"proje/{ProjeId}/hakedis/{HakedisId}/excel")"><Icon Name="download" /> Excel'e Aktar</a>
+        <a href="@($"proje/{ProjeId}/hakedis/{HakedisId}/pdf")"><Icon Name="file-text" /> PDF'e Aktar</a>
+    </div>
+
+    <div class="veri-tablo-wrap">
+    <table class="veri-tablo">
+        <thead>
+            <tr>
+                <th>Poz Kodu</th>
+                <th>Poz Adı</th>
+                <th>Önceki %</th>
+                <th>Bu Hakediş %</th>
+                <th>Bu Dönem %</th>
+                <th>Bu Dönem Tutar</th>
+                <th>Kümülatif Tutar</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var k in hakedis.Kalemler)
+            {
+                <tr>
+                    <td>@k.MetrajKalemi.Poz.PozKodu</td>
+                    <td>@k.MetrajKalemi.Poz.Ad</td>
+                    <td>%@k.OncekiKumulatifYuzde.ToString("0.##")</td>
+                    <td>%@k.KumulatifYuzde.ToString("0.##")</td>
+                    <td>%@k.BuDonemYuzde().ToString("0.##")</td>
+                    <td>@ParaFormatlayici.Formatla(k.BuDonemTutar())</td>
+                    <td>@ParaFormatlayici.Formatla(k.KumulatifTutar())</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+
+    <h3>Özet</h3>
+    <div class="veri-tablo-wrap">
+    <table class="veri-tablo">
+        <tbody>
+            <tr><td>Bu Dönem İmalat Tutarı</td><td>@ParaFormatlayici.Formatla(hakedis.BuDonemImalatTutari())</td></tr>
+            <tr><td>Fiyat Farkı</td><td>@ParaFormatlayici.Formatla(hakedis.FiyatFarkiTutari)</td></tr>
+            <tr><td>Brüt Hakediş Tutarı</td><td>@ParaFormatlayici.Formatla(hakedis.BrutHakedisTutari())</td></tr>
+            <tr><td>KDV (%@hakedis.KdvOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(hakedis.KdvTutari())</td></tr>
+            <tr><td>Teminat Kesintisi (%@hakedis.TeminatOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(-hakedis.TeminatKesintisi())</td></tr>
+            <tr><td>Stopaj Kesintisi (%@hakedis.StopajOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(-hakedis.StopajKesintisi())</td></tr>
+            <tr><td>Avans Mahsubu (%@hakedis.AvansOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(-hakedis.AvansMahsubu())</td></tr>
+            <tr><td><strong><Icon Name="banknote" Size="14" /> NET ÖDENECEK TUTAR</strong></td><td><strong>@ParaFormatlayici.Formatla(hakedis.NetOdenecekTutar())</strong></td></tr>
+        </tbody>
+    </table>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int ProjeId { get; set; }
+
+    [Parameter]
+    public int HakedisId { get; set; }
+
+    private Proje? proje;
+    private Hakedis? hakedis;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var sahipId = await AuthProvider.GetUserIdAsync();
+        proje = await Veri.ProjeBul(sahipId, ProjeId);
+        if (proje != null)
+        {
+            hakedis = await Veri.HakedisBul(sahipId, ProjeId, HakedisId);
+        }
+    }
+}

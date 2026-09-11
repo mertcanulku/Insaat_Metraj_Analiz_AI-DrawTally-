@@ -8,6 +8,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 {
     public DbSet<ProjeKaydi> Projeler => Set<ProjeKaydi>();
     public DbSet<MetrajKalemiKaydi> MetrajKalemleri => Set<MetrajKalemiKaydi>();
+    public DbSet<HakedisKaydi> Hakedisler => Set<HakedisKaydi>();
+    public DbSet<HakedisKalemiKaydi> HakedisKalemleri => Set<HakedisKalemiKaydi>();
 
     public DbSet<RayicKaydi> Rayicler => Set<RayicKaydi>();
     public DbSet<PozKaydi> Pozlar => Set<PozKaydi>();
@@ -28,6 +30,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(k => k.ProjeKaydi)
             .WithMany(p => p.MetrajKalemleri)
             .HasForeignKey(k => k.ProjeKaydiId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<HakedisKaydi>()
+            .HasOne(h => h.ProjeKaydi)
+            .WithMany(p => p.Hakedisler)
+            .HasForeignKey(h => h.ProjeKaydiId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<HakedisKalemiKaydi>()
+            .HasOne(k => k.HakedisKaydi)
+            .WithMany(h => h.Kalemler)
+            .HasForeignKey(k => k.HakedisKaydiId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<RayicKaydi>()

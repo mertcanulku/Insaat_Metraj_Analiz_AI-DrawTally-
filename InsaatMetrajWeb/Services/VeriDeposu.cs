@@ -62,6 +62,12 @@ public class VeriDeposu
     {
         Id = kayit.Id,
         Ad = kayit.Ad,
+        SozlesmeBedeli = kayit.SozlesmeBedeli,
+        VarsayilanAvansOrani = kayit.VarsayilanAvansOrani,
+        VarsayilanTeminatOrani = kayit.VarsayilanTeminatOrani,
+        VarsayilanStopajOrani = kayit.VarsayilanStopajOrani,
+        VarsayilanKdvOrani = kayit.VarsayilanKdvOrani,
+        AlanM2 = kayit.AlanM2,
         MetrajKalemleri = kayit.MetrajKalemleri
             .Select(k => PozIdIleBul(k.PozId) is { } poz
                 ? new MetrajKalemi { Id = k.Id, Poz = poz, OlcumDetayi = k.OlcumDetayi, Miktar = k.Miktar, Disiplin = k.Disiplin }
@@ -70,6 +76,75 @@ public class VeriDeposu
             .Select(k => k!)
             .ToList()
     };
+
+    /// <summary>Hakediş hesaplarında kullanılan sözleşme bedeli, varsayılan oranları ve proje alanını (m² — hakediş kredisi hesabında kullanılır) günceller.</summary>
+    public async Task ProjeAyarlariGuncelle(string sahipId, int projeId, decimal sozlesmeBedeli, decimal avansOrani, decimal teminatOrani, decimal stopajOrani, decimal kdvOrani, decimal alanM2)
+    {
+        var kayit = await _db.Projeler.FirstOrDefaultAsync(p => p.Id == projeId && p.SahipId == sahipId);
+        if (kayit == null) return;
+
+        kayit.SozlesmeBedeli = sozlesmeBedeli;
+        kayit.VarsayilanAvansOrani = avansOrani;
+        kayit.VarsayilanTeminatOrani = teminatOrani;
+        kayit.VarsayilanStopajOrani = stopajOrani;
+        kayit.VarsayilanKdvOrani = kdvOrani;
+        kayit.AlanM2 = alanM2;
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>Ay değiştiyse kullanıcının hakediş kredisini planının aylık limitine sıfırlar (tembel/lazy yenileme — arka planda zamanlanmış bir iş yok).</summary>
+    private static void KrediyiGerekirseYenile(ApplicationUser kullanici)
+    {
+        var buAy = DateTime.UtcNow.Year * 100 + DateTime.UtcNow.Month;
+        if (kullanici.HakedisKredisiDonemi != buAy)
+        {
+            kullanici.HakedisKredisiDonemi = buAy;
+            kullanici.KalanHakedisKredisi = UyelikServisi.AylikHakedisKredisi(kullanici.EtkinPlan);
+        }
+    }
+
+    /// <summary>
+    /// Kredi harcamadan, bir projede yeni hakediş oluşturmanın kaç krediye mal olacağını ve
+    /// kullanıcının bu ay kalan kredisini döner — form/liste sayfalarında önizleme için kullanılır.
+    /// </summary>
+    public async Task<(int GerekenKredi, int KalanKredi, bool Yetiyor)> HakedisKrediDurumu(string sahipId, int projeId)
+    {
+        var proje = await _db.Projeler.FirstOrDefaultAsync(p => p.Id == projeId && p.SahipId == sahipId);
+        var kullanici = await _db.Users.FirstOrDefaultAsync(u => u.Id == sahipId);
+        if (proje == null || kullanici == null) return (1, 0, false);
+
+        KrediyiGerekirseYenile(kullanici);
+        await _db.SaveChangesAsync();
+
+        var gereken = UyelikServisi.HakedisKrediMaliyeti(proje.AlanM2);
+        return (gereken, kullanici.KalanHakedisKredisi, kullanici.KalanHakedisKredisi >= gereken);
+    }
+
+    /// <summary>Kullanıcının bu ayki kalan hakediş kredisini döner (gerekirse tembel olarak yeniler) — üst bar gibi genel görünürlük için.</summary>
+    public async Task<int> KullaniciKalanKredisi(string sahipId)
+    {
+        var kullanici = await _db.Users.FirstOrDefaultAsync(u => u.Id == sahipId);
+        if (kullanici == null) return 0;
+
+        KrediyiGerekirseYenile(kullanici);
+        await _db.SaveChangesAsync();
+        return kullanici.KalanHakedisKredisi;
+    }
+
+    /// <summary>
+    /// Ek hakediş kredisi ekler (Profil sayfasındaki kredi paketleri). Ödeme entegrasyonu henüz
+    /// yok — plan değişimindeki gibi (bkz. Profil.razor PlanSec) şimdilik anında ve ücretsiz uygulanır.
+    /// </summary>
+    public async Task<int> KrediSatinAl(string sahipId, int miktar)
+    {
+        var kullanici = await _db.Users.FirstOrDefaultAsync(u => u.Id == sahipId);
+        if (kullanici == null) return 0;
+
+        KrediyiGerekirseYenile(kullanici);
+        kullanici.KalanHakedisKredisi += miktar;
+        await _db.SaveChangesAsync();
+        return kullanici.KalanHakedisKredisi;
+    }
 
     private Poz? PozIdIleBul(int id) => Pozlar.FirstOrDefault(p => p.Id == id);
 
@@ -339,5 +414,227 @@ public class VeriDeposu
         _db.MetrajKalemleri.Remove(kayit);
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    /// <summary>Starter kullanıcıya yükseltme daveti gösterip göstermeyeceğine karar vermek için — ilerleme verisini hiç çekmeden, projede en az bir hakediş var mı diye bakar.</summary>
+    public async Task<bool> HakedisVarMi(string sahipId, int projeId)
+    {
+        var projeVarMi = await _db.Projeler.AnyAsync(p => p.Id == projeId && p.SahipId == sahipId);
+        if (!projeVarMi) return false;
+
+        return await _db.Hakedisler.AnyAsync(h => h.ProjeKaydiId == projeId);
+    }
+
+    /// <summary>
+    /// Bir projenin en güncel (en yüksek HakedisNo'lu) hakedişindeki kalem bazlı kümülatif tamamlanma
+    /// yüzdelerini döner — Keşif Özeti'nde salt-okunur "tamamlanan/kalan" görünümü için kullanılır.
+    /// Hiç hakediş yoksa null döner (metraj kayıtlarına hiç dokunulmaz, sadece bu görünüm türetilir).
+    /// </summary>
+    public async Task<Dictionary<int, decimal>?> SonHakedisKalemYuzdeleri(string sahipId, int projeId)
+    {
+        var projeVarMi = await _db.Projeler.AnyAsync(p => p.Id == projeId && p.SahipId == sahipId);
+        if (!projeVarMi) return null;
+
+        var sonKayit = await _db.Hakedisler
+            .Where(h => h.ProjeKaydiId == projeId)
+            .Include(h => h.Kalemler)
+            .OrderByDescending(h => h.HakedisNo)
+            .FirstOrDefaultAsync();
+
+        return sonKayit?.Kalemler.ToDictionary(k => k.MetrajKalemiKaydiId, k => k.KumulatifYuzde);
+    }
+
+    /// <summary>Bir projenin hakedişlerini hakediş no sırasıyla özet olarak listeler.</summary>
+    public async Task<List<HakedisOzeti>> HakedisleriListele(string sahipId, int projeId)
+    {
+        var projeVarMi = await _db.Projeler.AnyAsync(p => p.Id == projeId && p.SahipId == sahipId);
+        if (!projeVarMi) return new();
+
+        var kayitlar = await _db.Hakedisler
+            .Where(h => h.ProjeKaydiId == projeId)
+            .Include(h => h.Kalemler)
+            .OrderBy(h => h.HakedisNo)
+            .ToListAsync();
+
+        var proje = await ProjeBul(sahipId, projeId);
+        if (proje == null) return new();
+
+        return kayitlar
+            .Select(k => HakedisiDomaineCevir(k, proje, kayitlar))
+            .Select(h => new HakedisOzeti { Id = h.Id, HakedisNo = h.HakedisNo, Tarih = h.Tarih, NetOdenecekTutar = h.NetOdenecekTutar() })
+            .ToList();
+    }
+
+    /// <summary>Belirli bir hakedişi (kalemleriyle, önceki hakedişe göre kümülatif farkı hesaplanmış olarak) döner.</summary>
+    public async Task<Hakedis?> HakedisBul(string sahipId, int projeId, int hakedisId)
+    {
+        var proje = await ProjeBul(sahipId, projeId);
+        if (proje == null) return null;
+
+        var kayit = await _db.Hakedisler
+            .Include(h => h.Kalemler)
+            .FirstOrDefaultAsync(h => h.Id == hakedisId && h.ProjeKaydiId == projeId);
+        if (kayit == null) return null;
+
+        var hepsi = await _db.Hakedisler.Where(h => h.ProjeKaydiId == projeId).Include(h => h.Kalemler).ToListAsync();
+        return HakedisiDomaineCevir(kayit, proje, hepsi);
+    }
+
+    private Hakedis HakedisiDomaineCevir(HakedisKaydi kayit, Proje proje, List<HakedisKaydi> ayniProjedekiHepsi)
+    {
+        var oncekiKayit = ayniProjedekiHepsi
+            .Where(h => h.HakedisNo < kayit.HakedisNo)
+            .OrderByDescending(h => h.HakedisNo)
+            .FirstOrDefault();
+
+        return new Hakedis
+        {
+            Id = kayit.Id,
+            HakedisNo = kayit.HakedisNo,
+            Tarih = kayit.Tarih,
+            AvansOrani = kayit.AvansOrani,
+            TeminatOrani = kayit.TeminatOrani,
+            StopajOrani = kayit.StopajOrani,
+            KdvOrani = kayit.KdvOrani,
+            FiyatFarkiOrani = kayit.FiyatFarkiOrani,
+            FiyatFarkiTutari = kayit.FiyatFarkiTutari,
+            Kalemler = kayit.Kalemler
+                .Select(hk => proje.MetrajKalemleri.FirstOrDefault(mk => mk.Id == hk.MetrajKalemiKaydiId) is { } metrajKalemi
+                    ? new HakedisKalemi
+                    {
+                        MetrajKalemi = metrajKalemi,
+                        KumulatifYuzde = hk.KumulatifYuzde,
+                        OncekiKumulatifYuzde = oncekiKayit?.Kalemler.FirstOrDefault(o => o.MetrajKalemiKaydiId == hk.MetrajKalemiKaydiId)?.KumulatifYuzde ?? 0
+                    }
+                    : null)
+                .Where(hk => hk != null)
+                .Select(hk => hk!)
+                .ToList()
+        };
+    }
+
+    /// <summary>
+    /// Hakediş formunun başlangıç durumunu hazırlar. hakedisId verilmişse var olan hakedişi
+    /// (HakedisBul ile) döner; null ise proje varsayılan oranlarıyla ve bir önceki hakedişin
+    /// kümülatif yüzdeleriyle (değişiklik yoksa aynı kalır) başlayan boş bir taslak oluşturur.
+    /// </summary>
+    public async Task<Hakedis?> HakedisFormuHazirla(string sahipId, int projeId, int? hakedisId)
+    {
+        if (hakedisId is { } id) return await HakedisBul(sahipId, projeId, id);
+
+        var proje = await ProjeBul(sahipId, projeId);
+        if (proje == null) return null;
+
+        var hepsi = await _db.Hakedisler.Where(h => h.ProjeKaydiId == projeId).Include(h => h.Kalemler).ToListAsync();
+        var sonKayit = hepsi.OrderByDescending(h => h.HakedisNo).FirstOrDefault();
+
+        return new Hakedis
+        {
+            HakedisNo = (sonKayit?.HakedisNo ?? 0) + 1,
+            Tarih = DateOnly.FromDateTime(DateTime.Now),
+            AvansOrani = proje.VarsayilanAvansOrani,
+            TeminatOrani = proje.VarsayilanTeminatOrani,
+            StopajOrani = proje.VarsayilanStopajOrani,
+            KdvOrani = proje.VarsayilanKdvOrani,
+            Kalemler = proje.MetrajKalemleri.Select(mk =>
+            {
+                var oncekiYuzde = sonKayit?.Kalemler.FirstOrDefault(k => k.MetrajKalemiKaydiId == mk.Id)?.KumulatifYuzde ?? 0;
+                return new HakedisKalemi { MetrajKalemi = mk, OncekiKumulatifYuzde = oncekiYuzde, KumulatifYuzde = oncekiYuzde };
+            }).ToList()
+        };
+    }
+
+    /// <summary>
+    /// Verilen kümülatif yüzdelerle projede yeni bir hakediş oluşturur (mevcutHakedisId null ise)
+    /// veya var olan bir hakedişi günceller. Bir kalemin kümülatif yüzdesi bir önceki hakedişten
+    /// düşük giriliyorsa kaydetmeyi reddeder — kümülatif tamamlanma geriye gidemez.
+    /// </summary>
+    public async Task<HakedisKaydetSonucu> HakedisKaydet(
+        string sahipId, int projeId, int? mevcutHakedisId, DateOnly tarih,
+        decimal avansOrani, decimal teminatOrani, decimal stopajOrani, decimal kdvOrani,
+        decimal fiyatFarkiOrani, decimal fiyatFarkiTutari,
+        Dictionary<int, decimal> kalemYuzdeleri)
+    {
+        var projeKaydi = await _db.Projeler.FirstOrDefaultAsync(p => p.Id == projeId && p.SahipId == sahipId);
+        if (projeKaydi == null) return new HakedisKaydetSonucu { Basarili = false, Mesaj = "Proje bulunamadı." };
+
+        var digerHakedisler = await _db.Hakedisler
+            .Where(h => h.ProjeKaydiId == projeId && h.Id != (mevcutHakedisId ?? 0))
+            .Include(h => h.Kalemler)
+            .ToListAsync();
+
+        HakedisKaydi kayit;
+        if (mevcutHakedisId is { } id)
+        {
+            var bulunan = await _db.Hakedisler.Include(h => h.Kalemler).FirstOrDefaultAsync(h => h.Id == id && h.ProjeKaydiId == projeId);
+            if (bulunan == null) return new HakedisKaydetSonucu { Basarili = false, Mesaj = "Hakediş bulunamadı." };
+            kayit = bulunan;
+        }
+        else
+        {
+            kayit = new HakedisKaydi
+            {
+                ProjeKaydiId = projeId,
+                HakedisNo = digerHakedisler.Count == 0 ? 1 : digerHakedisler.Max(h => h.HakedisNo) + 1
+            };
+        }
+
+        var oncekiKayit = digerHakedisler
+            .Where(h => h.HakedisNo < kayit.HakedisNo)
+            .OrderByDescending(h => h.HakedisNo)
+            .FirstOrDefault();
+
+        foreach (var (metrajKalemiId, yeniYuzde) in kalemYuzdeleri)
+        {
+            var oncekiYuzde = oncekiKayit?.Kalemler.FirstOrDefault(k => k.MetrajKalemiKaydiId == metrajKalemiId)?.KumulatifYuzde ?? 0;
+            if (yeniYuzde < oncekiYuzde)
+            {
+                var kalemAdi = (await _db.MetrajKalemleri.FindAsync(metrajKalemiId))?.OlcumDetayi ?? $"#{metrajKalemiId}";
+                return new HakedisKaydetSonucu
+                {
+                    Basarili = false,
+                    Mesaj = $"\"{kalemAdi}\" kalemi için girilen kümülatif yüzde (%{yeniYuzde:0.##}) bir önceki hakedişten (%{oncekiYuzde:0.##}) düşük olamaz."
+                };
+            }
+        }
+
+        // Kredi sadece YENİ hakediş oluştururken harcanır — düzenleme/görüntüleme/export ücretsiz.
+        if (mevcutHakedisId == null)
+        {
+            var kullanici = await _db.Users.FirstOrDefaultAsync(u => u.Id == sahipId);
+            if (kullanici == null) return new HakedisKaydetSonucu { Basarili = false, Mesaj = "Kullanıcı bulunamadı." };
+
+            KrediyiGerekirseYenile(kullanici);
+            var gerekenKredi = UyelikServisi.HakedisKrediMaliyeti(projeKaydi.AlanM2);
+            if (kullanici.KalanHakedisKredisi < gerekenKredi)
+            {
+                return new HakedisKaydetSonucu
+                {
+                    Basarili = false,
+                    Mesaj = $"Bu ay için hakediş krediniz yetersiz (gereken: {gerekenKredi}, kalan: {kullanici.KalanHakedisKredisi}). Krediniz bir sonraki ay yenilenecek."
+                };
+            }
+            kullanici.KalanHakedisKredisi -= gerekenKredi;
+        }
+
+        kayit.Tarih = tarih;
+        kayit.AvansOrani = avansOrani;
+        kayit.TeminatOrani = teminatOrani;
+        kayit.StopajOrani = stopajOrani;
+        kayit.KdvOrani = kdvOrani;
+        kayit.FiyatFarkiOrani = fiyatFarkiOrani;
+        kayit.FiyatFarkiTutari = fiyatFarkiTutari;
+
+        kayit.Kalemler.Clear();
+        foreach (var (metrajKalemiId, yeniYuzde) in kalemYuzdeleri)
+        {
+            kayit.Kalemler.Add(new HakedisKalemiKaydi { MetrajKalemiKaydiId = metrajKalemiId, KumulatifYuzde = yeniYuzde });
+        }
+
+        if (mevcutHakedisId == null)
+            _db.Hakedisler.Add(kayit);
+
+        await _db.SaveChangesAsync();
+        return new HakedisKaydetSonucu { Basarili = true, Mesaj = "Hakediş kaydedildi.", HakedisId = kayit.Id };
     }
 }

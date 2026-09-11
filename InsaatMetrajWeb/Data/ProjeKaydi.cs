@@ -10,6 +10,19 @@ public class ProjeKaydi
     public string SahipId { get; set; } = "";
     public ApplicationUser? Sahip { get; set; }
     public List<MetrajKalemiKaydi> MetrajKalemleri { get; set; } = new();
+
+    /// <summary>Hakediş hesaplarında kullanılan sözleşme bedeli ve varsayılan kesinti/avans oranları —
+    /// her yeni hakediş oluşturulurken önerilen (ama değiştirilebilir) değer olarak bunlardan gelir.</summary>
+    public decimal SozlesmeBedeli { get; set; }
+    public decimal VarsayilanAvansOrani { get; set; }
+    public decimal VarsayilanTeminatOrani { get; set; }
+    public decimal VarsayilanStopajOrani { get; set; }
+    public decimal VarsayilanKdvOrani { get; set; } = 20;
+
+    /// <summary>Projenin toplam alanı (m²) — hakediş oluşturma kredisi bu değere göre hesaplanır, bkz. UyelikServisi.HakedisKrediMaliyeti.</summary>
+    public decimal AlanM2 { get; set; }
+
+    public List<HakedisKaydi> Hakedisler { get; set; } = new();
 }
 
 /// <summary>

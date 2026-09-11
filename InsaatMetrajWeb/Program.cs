@@ -18,11 +18,10 @@ var builder = WebApplication.CreateBuilder(args);
 // yüklensin diye açıkça ekliyoruz — appsettings.json'a secret yazmaktan kaçınmak için.
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 
-var port = Environment.GetEnvironmentVariable("PORT");
-if (!string.IsNullOrEmpty(port))
-{
-    builder.WebHost.UseUrls($"http://localhost:{port}");
-}
+// 0.0.0.0 üzerinden dinlenir (sadece localhost değil) — aynı ağdaki (LAN) başka bilgisayar ve
+// telefonlar, bu makinenin yerel IP adresi üzerinden (ör. http://192.168.1.23:5000) erişebilsin diye.
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -219,6 +218,50 @@ app.MapGet("/proje/{id:int}/pdf", async (int id, System.Security.Claims.ClaimsPr
 
     var icerik = PdfDisaAktarimServisi.ProjeyiPdfOlarakOlustur(proje, firmaLogosu: sahip.FirmaLogoVerisi);
     return Results.File(icerik, "application/pdf", $"{dosyaAdi}-kesif-ozeti.pdf");
+}).RequireAuthorization();
+
+// Bir hakedişin .xlsx olarak indirilmesi — /proje/{id}/excel ile aynı sebepten düz endpoint.
+app.MapGet("/proje/{id:int}/hakedis/{hakedisId:int}/excel", async (int id, int hakedisId, System.Security.Claims.ClaimsPrincipal kullanici, VeriDeposu veri, UserManager<ApplicationUser> userManager) =>
+{
+    var sahipId = kullanici.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    if (sahipId == null) return Results.Challenge();
+
+    var sahip = await userManager.FindByIdAsync(sahipId);
+    if (sahip == null || !UyelikServisi.DisaAktarimIzinli(sahip.EtkinPlan))
+        return Results.Forbid();
+
+    var proje = await veri.ProjeBul(sahipId, id);
+    var hakedis = await veri.HakedisBul(sahipId, id, hakedisId);
+    if (proje == null || hakedis == null) return Results.NotFound();
+
+    var dosyaAdi = string.Concat(proje.Ad.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+    if (dosyaAdi.Length == 0) dosyaAdi = "proje";
+
+    var icerik = HakedisExcelDisaAktarimServisi.HakedisiXlsxOlarakOlustur(proje, hakedis, firmaLogosu: sahip.FirmaLogoVerisi);
+    return Results.File(icerik,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        $"{dosyaAdi}-hakedis-{hakedis.HakedisNo}.xlsx");
+}).RequireAuthorization();
+
+// Bir hakedişin .pdf olarak indirilmesi.
+app.MapGet("/proje/{id:int}/hakedis/{hakedisId:int}/pdf", async (int id, int hakedisId, System.Security.Claims.ClaimsPrincipal kullanici, VeriDeposu veri, UserManager<ApplicationUser> userManager) =>
+{
+    var sahipId = kullanici.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    if (sahipId == null) return Results.Challenge();
+
+    var sahip = await userManager.FindByIdAsync(sahipId);
+    if (sahip == null || !UyelikServisi.DisaAktarimIzinli(sahip.EtkinPlan))
+        return Results.Forbid();
+
+    var proje = await veri.ProjeBul(sahipId, id);
+    var hakedis = await veri.HakedisBul(sahipId, id, hakedisId);
+    if (proje == null || hakedis == null) return Results.NotFound();
+
+    var dosyaAdi = string.Concat(proje.Ad.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+    if (dosyaAdi.Length == 0) dosyaAdi = "proje";
+
+    var icerik = HakedisPdfDisaAktarimServisi.HakedisiPdfOlarakOlustur(proje, hakedis, firmaLogosu: sahip.FirmaLogoVerisi);
+    return Results.File(icerik, "application/pdf", $"{dosyaAdi}-hakedis-{hakedis.HakedisNo}.pdf");
 }).RequireAuthorization();
 
 // Firma logosu önizlemesi — Profil.razor'daki <img> burada gösterir. Yalnızca oturum sahibinin

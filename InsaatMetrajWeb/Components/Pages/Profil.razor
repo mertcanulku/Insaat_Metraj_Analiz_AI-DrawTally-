@@ -8,6 +8,7 @@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject AuthenticationStateProvider AuthProvider
 @inject IdentityRedirectManager RedirectManager
+@inject VeriDeposu Veri
 
 <h1>Profil</h1>
 
@@ -57,6 +58,31 @@
 
     <p class="uyelik-not">
         <Icon Name="shield" /> Ödeme entegrasyonu henüz eklenmedi — plan değişimi şimdilik buradan anında ve ücretsiz uygulanır.
+    </p>
+</details>
+
+<details class="account-card account-card-wide" open>
+    <summary>Hakediş Kredisi</summary>
+    <p>Bu ay kalan hakediş krediniz: <strong>@kalanKredi</strong> (her ay planınızın limitine yenilenir, üstüne satın aldığın kredi kalıcı olarak eklenir).</p>
+
+    @if (!string.IsNullOrEmpty(krediMesaji))
+    {
+        <div class="uyelik-banner"><Icon Name="check" /> @krediMesaji</div>
+    }
+
+    <div class="uyelik-plan-grid">
+        @foreach (var paket in krediPaketleri)
+        {
+            <div class="uyelik-plan-kart">
+                <div class="uyelik-plan-baslik"><Icon Name="banknote" /> @paket.Miktar Kredi</div>
+                <div class="uyelik-plan-fiyat">@paket.Etiket</div>
+                <button class="btn-primary" @onclick="() => KrediSatinAl(paket.Miktar)">Satın Al</button>
+            </div>
+        }
+    </div>
+
+    <p class="uyelik-not">
+        <Icon Name="shield" /> Ödeme entegrasyonu henüz eklenmedi — kredi satın alma şimdilik buradan anında ve ücretsiz uygulanır.
     </p>
 </details>
 
@@ -239,6 +265,18 @@
     private ProfilInputModel ProfilInput { get; set; } = new();
     private SifreInputModel SifreInput { get; set; } = new();
 
+    private int kalanKredi;
+    private string? krediMesaji;
+
+    private sealed record KrediPaketi(int Miktar, string Etiket);
+
+    private readonly List<KrediPaketi> krediPaketleri = new()
+    {
+        new(10, "Tek seferlik"),
+        new(50, "Tek seferlik"),
+        new(200, "Tek seferlik"),
+    };
+
     private sealed record PlanBilgisi(UyelikPlani Tur, string Ad, string FiyatMetni, string[] Ozellikler);
 
     private readonly List<PlanBilgisi> planlar = new()
@@ -248,6 +286,7 @@
             $"En fazla {UyelikServisi.ProjeSiniri(UyelikPlani.Starter)} proje",
             "Poz kütüphanesine tam erişim",
             "CSV/PDF çizim import",
+            $"Hakediş yönetimi (temel — sadece imalat tutarı ve %, ayda {UyelikServisi.AylikHakedisKredisi(UyelikPlani.Starter)} kredi)",
         }),
         new(UyelikPlani.Pro, "Pro", "Aylık abonelik", new[]
         {
@@ -255,6 +294,8 @@
             "Excel/PDF keşif özeti dışa aktarımı",
             "Poz kütüphanesine tam erişim",
             "CSV/PDF çizim import",
+            $"Hakediş yönetimi (tam kapsamlı — kesinti/avans/fiyat farkı dahil, ayda {UyelikServisi.AylikHakedisKredisi(UyelikPlani.Pro)} kredi)",
+            "İlerleme görünümü (tamamlanan/kalan)",
         }),
         new(UyelikPlani.Business, "Business", "Aylık abonelik", new[]
         {
@@ -262,6 +303,8 @@
             "Excel/PDF keşif özeti dışa aktarımı",
             "Poz kütüphanesine tam erişim",
             "CSV/PDF çizim import",
+            $"Hakediş yönetimi (tam kapsamlı — kesinti/avans/fiyat farkı dahil, ayda {UyelikServisi.AylikHakedisKredisi(UyelikPlani.Business)} kredi)",
+            "İlerleme görünümü (tamamlanan/kalan)",
         }),
     };
 
@@ -287,6 +330,15 @@
         }
 
         GuncelleDenemeSuresi();
+        kalanKredi = await Veri.KullaniciKalanKredisi(sahipId);
+    }
+
+    private async Task KrediSatinAl(int miktar)
+    {
+        if (kullanici == null) return;
+
+        kalanKredi = await Veri.KrediSatinAl(kullanici.Id, miktar);
+        krediMesaji = $"{miktar} kredi eklendi. Yeni bakiyen: {kalanKredi} kredi.";
     }
 
     private void GuncelleDenemeSuresi()
