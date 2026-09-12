@@ -1,0 +1,149 @@
+@page "/admin/endeks-yonetimi"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject VeriDeposu Veri
+
+<p><a href="/"><Icon Name="arrow-left" /> Proje listesi</a></p>
+<h1><Icon Name="calculator" /> Endeks Yönetimi</h1>
+<p class="ipucu">
+    TÜİK Yİ-ÜFE (yurt içi üretici fiyat endeksi) aylık değerlerini burada elle girersin — resmi bir
+    API bulunmadığından fiyat farkı otomasyonu (bkz. Hakediş &gt; Fiyat Farkı &gt; "Otomatik hesapla")
+    bu tablodaki dönemleri kullanır. Bir dönem eksikse o dönemi kapsayan hakedişler için otomatik
+    hesaplama başarısız olur ve kullanıcıya hangi dönemin eksik olduğu gösterilir.
+</p>
+
+<h3>@(duzenlenenId == null ? "Yeni Dönem Ekle" : "Dönemi Güncelle")</h3>
+<div class="form-satir">
+    <label>Yıl:</label>
+    <input type="number" step="1" @bind="yil" />
+</div>
+<div class="form-satir">
+    <label>Ay (1-12):</label>
+    <input type="number" step="1" min="1" max="12" @bind="ay" />
+</div>
+<div class="form-satir">
+    <label>TÜİK Yİ-ÜFE Değeri:</label>
+    <input type="number" step="0.0001" @bind="tufeYiUfeDegeri" />
+</div>
+<div class="form-satir">
+    <label>Bakanlık Katsayısı (opsiyonel):</label>
+    <input type="number" step="0.0001" @bind="bakanlikKatsayisi" />
+</div>
+<button @onclick="Kaydet"><Icon Name="check" /> @(duzenlenenId == null ? "Ekle" : "Güncelle")</button>
+@if (duzenlenenId != null)
+{
+    <button type="button" @onclick="DuzenlemeyiIptalEt">İptal</button>
+}
+@if (!string.IsNullOrEmpty(mesaj))
+{
+    <p class="@(mesajBasarili ? "basarili-mesaj" : "hata-mesaj")">@mesaj</p>
+}
+
+<h3>Girilmiş Dönemler</h3>
+@if (endeksler.Count == 0)
+{
+    <div class="bos-durum">
+        <strong>Henüz hiç endeks dönemi girilmemiş</strong>
+        <span>Yukarıdaki formla ilk dönemi ekleyebilirsin.</span>
+    </div>
+}
+else
+{
+    <div class="veri-tablo-wrap">
+    <table class="veri-tablo">
+        <thead>
+            <tr>
+                <th>Dönem</th>
+                <th>TÜİK Yİ-ÜFE</th>
+                <th>Bakanlık Katsayısı</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in endeksler)
+            {
+                <tr>
+                    <td>@e.DonemMetni()</td>
+                    <td>@e.TufeYiUfeDegeri.ToString("0.####")</td>
+                    <td>@(e.BakanlikKatsayisi?.ToString("0.####") ?? "—")</td>
+                    <td>
+                        <button type="button" @onclick="() => DuzenlemeyeBasla(e)"><Icon Name="plus" /> Düzenle</button>
+                        <button type="button" class="btn-danger" @onclick="() => Sil(e.Id)"><Icon Name="trash" /> Sil</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+}
+
+@code {
+    private List<EndeksDonemi> endeksler = new();
+    private int? duzenlenenId;
+    private int yil = DateTime.Now.Year;
+    private int ay = DateTime.Now.Month;
+    private decimal tufeYiUfeDegeri;
+    private decimal? bakanlikKatsayisi;
+    private string mesaj = "";
+    private bool mesajBasarili;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Yenile();
+    }
+
+    private async Task Yenile()
+    {
+        endeksler = await Veri.EndeksleriListele();
+    }
+
+    private void DuzenlemeyeBasla(EndeksDonemi e)
+    {
+        duzenlenenId = e.Id;
+        yil = e.Yil;
+        ay = e.Ay;
+        tufeYiUfeDegeri = e.TufeYiUfeDegeri;
+        bakanlikKatsayisi = e.BakanlikKatsayisi;
+        mesaj = "";
+    }
+
+    private void DuzenlemeyiIptalEt()
+    {
+        duzenlenenId = null;
+        yil = DateTime.Now.Year;
+        ay = DateTime.Now.Month;
+        tufeYiUfeDegeri = 0;
+        bakanlikKatsayisi = null;
+        mesaj = "";
+    }
+
+    private async Task Kaydet()
+    {
+        if (ay is < 1 or > 12)
+        {
+            mesaj = "Ay 1 ile 12 arasında olmalı.";
+            mesajBasarili = false;
+            return;
+        }
+
+        if (tufeYiUfeDegeri <= 0)
+        {
+            mesaj = "TÜİK Yİ-ÜFE değeri 0'dan büyük olmalı.";
+            mesajBasarili = false;
+            return;
+        }
+
+        await Veri.EndeksEkleVeyaGuncelle(yil, ay, tufeYiUfeDegeri, bakanlikKatsayisi);
+        var kaydedilenDonem = $"{yil}-{ay:00}";
+        DuzenlemeyiIptalEt();
+        mesaj = $"{kaydedilenDonem} dönemi kaydedildi.";
+        mesajBasarili = true;
+        await Yenile();
+    }
+
+    private async Task Sil(int id)
+    {
+        await Veri.EndeksSil(id);
+        await Yenile();
+    }
+}

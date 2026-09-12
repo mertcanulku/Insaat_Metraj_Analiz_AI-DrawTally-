@@ -95,7 +95,7 @@ public static class HakedisPdfDisaAktarimServisi
                         }
 
                         OzetSatiri("Bu Dönem İmalat Tutarı", hakedis.BuDonemImalatTutari());
-                        OzetSatiri("Fiyat Farkı", hakedis.FiyatFarkiTutari);
+                        OzetSatiri($"Fiyat Farkı ({(hakedis.FiyatFarkiOtomatikMi ? "Otomatik" : "Elle")})", hakedis.FiyatFarkiTutari);
                         OzetSatiri("Brüt Hakediş Tutarı", hakedis.BrutHakedisTutari());
                         OzetSatiri($"KDV (%{hakedis.KdvOrani:0.##})", hakedis.KdvTutari());
                         OzetSatiri($"Teminat Kesintisi (%{hakedis.TeminatOrani:0.##})", -hakedis.TeminatKesintisi());

@@ -86,7 +86,7 @@ public static class HakedisExcelDisaAktarimServisi
         }
 
         OzetEkle("Bu Dönem İmalat Tutarı", hakedis.BuDonemImalatTutari());
-        OzetEkle("Fiyat Farkı", hakedis.FiyatFarkiTutari);
+        OzetEkle($"Fiyat Farkı ({(hakedis.FiyatFarkiOtomatikMi ? "Otomatik" : "Elle")})", hakedis.FiyatFarkiTutari);
         OzetEkle("Brüt Hakediş Tutarı", hakedis.BrutHakedisTutari());
         OzetEkle($"KDV (%{hakedis.KdvOrani:0.##})", hakedis.KdvTutari());
         OzetEkle($"Teminat Kesintisi (%{hakedis.TeminatOrani:0.##})", -hakedis.TeminatKesintisi());

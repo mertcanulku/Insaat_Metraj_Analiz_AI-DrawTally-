@@ -10,6 +10,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<MetrajKalemiKaydi> MetrajKalemleri => Set<MetrajKalemiKaydi>();
     public DbSet<HakedisKaydi> Hakedisler => Set<HakedisKaydi>();
     public DbSet<HakedisKalemiKaydi> HakedisKalemleri => Set<HakedisKalemiKaydi>();
+    public DbSet<EndeksDonemiKaydi> EndeksDonemleri => Set<EndeksDonemiKaydi>();
 
     public DbSet<RayicKaydi> Rayicler => Set<RayicKaydi>();
     public DbSet<PozKaydi> Pozlar => Set<PozKaydi>();
@@ -43,6 +44,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany(h => h.Kalemler)
             .HasForeignKey(k => k.HakedisKaydiId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<EndeksDonemiKaydi>()
+            .HasIndex(e => new { e.Yil, e.Ay })
+            .IsUnique();
 
         builder.Entity<RayicKaydi>()
             .HasIndex(r => r.Kod);

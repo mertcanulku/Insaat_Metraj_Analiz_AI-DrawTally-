@@ -14,6 +14,10 @@ public class ProjeKaydi
     /// <summary>Hakediş hesaplarında kullanılan sözleşme bedeli ve varsayılan kesinti/avans oranları —
     /// her yeni hakediş oluşturulurken önerilen (ama değiştirilebilir) değer olarak bunlardan gelir.</summary>
     public decimal SozlesmeBedeli { get; set; }
+
+    /// <summary>Fiyat farkı otomasyonunda temel dönem olarak kullanılır — bkz. Models/Proje.cs.</summary>
+    public DateOnly? SozlesmeTarihi { get; set; }
+
     public decimal VarsayilanAvansOrani { get; set; }
     public decimal VarsayilanTeminatOrani { get; set; }
     public decimal VarsayilanStopajOrani { get; set; }

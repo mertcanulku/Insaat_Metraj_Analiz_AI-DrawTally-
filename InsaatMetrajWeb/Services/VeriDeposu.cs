@@ -68,6 +68,7 @@ public class VeriDeposu
         VarsayilanStopajOrani = kayit.VarsayilanStopajOrani,
         VarsayilanKdvOrani = kayit.VarsayilanKdvOrani,
         VarsayilanSgkKesintiOrani = kayit.VarsayilanSgkKesintiOrani,
+        SozlesmeTarihi = kayit.SozlesmeTarihi,
         AlanM2 = kayit.AlanM2,
         MetrajKalemleri = kayit.MetrajKalemleri
             .Select(k => PozIdIleBul(k.PozId) is { } poz
@@ -79,12 +80,13 @@ public class VeriDeposu
     };
 
     /// <summary>Hakediş hesaplarında kullanılan sözleşme bedeli, varsayılan oranları ve proje alanını (m² — hakediş kredisi hesabında kullanılır) günceller.</summary>
-    public async Task ProjeAyarlariGuncelle(string sahipId, int projeId, decimal sozlesmeBedeli, decimal avansOrani, decimal teminatOrani, decimal stopajOrani, decimal kdvOrani, decimal sgkKesintiOrani, decimal alanM2)
+    public async Task ProjeAyarlariGuncelle(string sahipId, int projeId, decimal sozlesmeBedeli, DateOnly? sozlesmeTarihi, decimal avansOrani, decimal teminatOrani, decimal stopajOrani, decimal kdvOrani, decimal sgkKesintiOrani, decimal alanM2)
     {
         var kayit = await _db.Projeler.FirstOrDefaultAsync(p => p.Id == projeId && p.SahipId == sahipId);
         if (kayit == null) return;
 
         kayit.SozlesmeBedeli = sozlesmeBedeli;
+        kayit.SozlesmeTarihi = sozlesmeTarihi;
         kayit.VarsayilanAvansOrani = avansOrani;
         kayit.VarsayilanTeminatOrani = teminatOrani;
         kayit.VarsayilanStopajOrani = stopajOrani;
@@ -501,6 +503,8 @@ public class VeriDeposu
             SgkKesintiOrani = kayit.SgkKesintiOrani,
             FiyatFarkiOrani = kayit.FiyatFarkiOrani,
             FiyatFarkiTutari = kayit.FiyatFarkiTutari,
+            FiyatFarkiOtomatikMi = kayit.FiyatFarkiOtomatikMi,
+            FiyatFarkiHesaplamaOzeti = kayit.FiyatFarkiHesaplamaOzeti,
             Kalemler = kayit.Kalemler
                 .Select(hk => proje.MetrajKalemleri.FirstOrDefault(mk => mk.Id == hk.MetrajKalemiKaydiId) is { } metrajKalemi
                     ? new HakedisKalemi
@@ -556,7 +560,7 @@ public class VeriDeposu
     public async Task<HakedisKaydetSonucu> HakedisKaydet(
         string sahipId, int projeId, int? mevcutHakedisId, DateOnly tarih,
         decimal avansOrani, decimal teminatOrani, decimal stopajOrani, decimal kdvOrani, decimal sgkKesintiOrani,
-        decimal fiyatFarkiOrani, decimal fiyatFarkiTutari,
+        decimal fiyatFarkiOrani, decimal fiyatFarkiTutari, bool fiyatFarkiOtomatikMi, string fiyatFarkiHesaplamaOzeti,
         Dictionary<int, decimal> kalemYuzdeleri)
     {
         var projeKaydi = await _db.Projeler.FirstOrDefaultAsync(p => p.Id == projeId && p.SahipId == sahipId);
@@ -629,6 +633,8 @@ public class VeriDeposu
         kayit.SgkKesintiOrani = sgkKesintiOrani;
         kayit.FiyatFarkiOrani = fiyatFarkiOrani;
         kayit.FiyatFarkiTutari = fiyatFarkiTutari;
+        kayit.FiyatFarkiOtomatikMi = fiyatFarkiOtomatikMi;
+        kayit.FiyatFarkiHesaplamaOzeti = fiyatFarkiHesaplamaOzeti;
 
         kayit.Kalemler.Clear();
         foreach (var (metrajKalemiId, yeniYuzde) in kalemYuzdeleri)
@@ -641,5 +647,66 @@ public class VeriDeposu
 
         await _db.SaveChangesAsync();
         return new HakedisKaydetSonucu { Basarili = true, Mesaj = "Hakediş kaydedildi.", HakedisId = kayit.Id };
+    }
+
+    /// <summary>Tüm endeks dönemi kayıtlarını en yeni önce listeler — Endeks Yönetimi sayfası için.</summary>
+    public async Task<List<EndeksDonemi>> EndeksleriListele()
+    {
+        var kayitlar = await _db.EndeksDonemleri
+            .OrderByDescending(e => e.Yil).ThenByDescending(e => e.Ay)
+            .ToListAsync();
+
+        return kayitlar.Select(KaydiEndekseCevir).ToList();
+    }
+
+    private static EndeksDonemi KaydiEndekseCevir(EndeksDonemiKaydi kayit) => new()
+    {
+        Id = kayit.Id,
+        Yil = kayit.Yil,
+        Ay = kayit.Ay,
+        TufeYiUfeDegeri = kayit.TufeYiUfeDegeri,
+        BakanlikKatsayisi = kayit.BakanlikKatsayisi
+    };
+
+    /// <summary>
+    /// Bir (yıl, ay) dönemi için endeks değerini ekler veya varsa günceller — Endeks Yönetimi
+    /// sayfasındaki form bu metodu kullanır, aynı dönem için ayrı ekle/güncelle akışı gerekmez.
+    /// </summary>
+    public async Task EndeksEkleVeyaGuncelle(int yil, int ay, decimal tufeYiUfeDegeri, decimal? bakanlikKatsayisi)
+    {
+        var kayit = await _db.EndeksDonemleri.FirstOrDefaultAsync(e => e.Yil == yil && e.Ay == ay);
+        if (kayit == null)
+        {
+            kayit = new EndeksDonemiKaydi { Yil = yil, Ay = ay };
+            _db.EndeksDonemleri.Add(kayit);
+        }
+
+        kayit.TufeYiUfeDegeri = tufeYiUfeDegeri;
+        kayit.BakanlikKatsayisi = bakanlikKatsayisi;
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task EndeksSil(int id)
+    {
+        var kayit = await _db.EndeksDonemleri.FindAsync(id);
+        if (kayit == null) return;
+
+        _db.EndeksDonemleri.Remove(kayit);
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Bir projenin sözleşme (temel) dönemi ile verilen hakediş dönemi arasındaki TÜİK Yİ-ÜFE
+    /// farkına göre fiyat farkını hesaplar (bkz. FiyatFarkiHesaplamaServisi). Sadece hesaplar,
+    /// hiçbir kaydı değiştirmez — sonucu forma önerip önermemeye HakedisForm.razor karar verir.
+    /// </summary>
+    public async Task<FiyatFarkiSonucu> FiyatFarkiniOtomatikHesapla(string sahipId, int projeId, DateOnly hakedisTarihi, decimal imalatTutari)
+    {
+        var projeKaydi = await _db.Projeler.FirstOrDefaultAsync(p => p.Id == projeId && p.SahipId == sahipId);
+        if (projeKaydi == null)
+            return new FiyatFarkiSonucu { Basarili = false, Mesaj = "Proje bulunamadı." };
+
+        var endeksler = await EndeksleriListele();
+        return FiyatFarkiHesaplamaServisi.Hesapla(projeKaydi.SozlesmeTarihi, hakedisTarihi, imalatTutari, endeksler);
     }
 }

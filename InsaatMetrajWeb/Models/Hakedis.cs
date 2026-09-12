@@ -24,6 +24,14 @@ public class Hakedis
     public decimal FiyatFarkiOrani { get; set; }
     public decimal FiyatFarkiTutari { get; set; }
 
+    /// <summary>true ise FiyatFarkiOrani/Tutari, FiyatFarkiHesaplamaServisi tarafından TÜİK endeksinden
+    /// otomatik önerildi; false ise kullanıcı elle girdi/değiştirdi — bkz. HakedisForm.razor.</summary>
+    public bool FiyatFarkiOtomatikMi { get; set; }
+
+    /// <summary>Otomatik hesaplamanın hangi endeks dönemlerini kullandığını özetleyen, kullanıcıya
+    /// gösterilen kısa metin (şeffaflık için) — otomatik değilse boş.</summary>
+    public string FiyatFarkiHesaplamaOzeti { get; set; } = "";
+
     public List<HakedisKalemi> Kalemler { get; set; } = new();
 
     /// <summary>Bu dönemde yapılan imalatın tutarı (kalemlerin bu-dönem tutarları toplamı).</summary>
@@ -72,6 +80,22 @@ public class HakedisKaydetSonucu
     public bool Basarili { get; set; }
     public string Mesaj { get; set; } = "";
     public int? HakedisId { get; set; }
+}
+
+/// <summary>
+/// FiyatFarkiHesaplamaServisi'nin bir hesaplama denemesinin sonucu — temel (sözleşme) dönemi ile
+/// hakediş dönemi endeksleri bulunamazsa Basarili=false ve sebebi Mesaj'da döner; bulunursa
+/// hesaplanan Oran/Tutar ile birlikte hangi dönemlerin kullanıldığını (Ozet) da taşır.
+/// </summary>
+public class FiyatFarkiSonucu
+{
+    public bool Basarili { get; set; }
+    public string Mesaj { get; set; } = "";
+    public string Ozet { get; set; } = "";
+    public decimal Oran { get; set; }
+    public decimal Tutar { get; set; }
+    public EndeksDonemi? TemelDonem { get; set; }
+    public EndeksDonemi? HakedisDonemi { get; set; }
 }
 
 /// <summary>Hakediş listesinde gösterilen özet satır.</summary>

@@ -58,7 +58,11 @@ else
     <table class="veri-tablo">
         <tbody>
             <tr><td>Bu Dönem İmalat Tutarı</td><td>@ParaFormatlayici.Formatla(hakedis.BuDonemImalatTutari())</td></tr>
-            <tr><td>Fiyat Farkı</td><td>@ParaFormatlayici.Formatla(hakedis.FiyatFarkiTutari)</td></tr>
+            <tr><td>Fiyat Farkı (@(hakedis.FiyatFarkiOtomatikMi ? "Otomatik" : "Elle"))</td><td>@ParaFormatlayici.Formatla(hakedis.FiyatFarkiTutari)</td></tr>
+            @if (hakedis.FiyatFarkiOtomatikMi && !string.IsNullOrEmpty(hakedis.FiyatFarkiHesaplamaOzeti))
+            {
+                <tr><td colspan="2" class="ipucu">@hakedis.FiyatFarkiHesaplamaOzeti</td></tr>
+            }
             <tr><td>Brüt Hakediş Tutarı</td><td>@ParaFormatlayici.Formatla(hakedis.BrutHakedisTutari())</td></tr>
             <tr><td>KDV (%@hakedis.KdvOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(hakedis.KdvTutari())</td></tr>
             <tr><td>Teminat Kesintisi (%@hakedis.TeminatOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(-hakedis.TeminatKesintisi())</td></tr>

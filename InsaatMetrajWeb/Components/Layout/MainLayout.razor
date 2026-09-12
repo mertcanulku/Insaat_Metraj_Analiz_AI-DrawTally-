@@ -18,6 +18,13 @@
             <span class="nav-group-label">Keşif ve Metraj</span>
             <NavLink href="projeler" Match="NavLinkMatch.All"><Icon Name="folder" /> Projeler</NavLink>
             <NavLink href="poz-kutuphanesi"><Icon Name="library" /> Poz Kütüphanesi</NavLink>
+
+            <AuthorizeView Roles="Admin">
+                <Authorized>
+                    <span class="nav-group-label">Yönetim</span>
+                    <NavLink href="admin/endeks-yonetimi"><Icon Name="calculator" /> Endeks Yönetimi</NavLink>
+                </Authorized>
+            </AuthorizeView>
         </div>
     </nav>
     <main class="content">

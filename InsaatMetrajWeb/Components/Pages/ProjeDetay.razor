@@ -38,6 +38,11 @@ else
             <input type="number" step="0.01" @bind="sozlesmeBedeli" />
         </div>
         <div class="form-satir">
+            <label>Sözleşme Tarihi:</label>
+            <input type="date" @bind="sozlesmeTarihi" />
+        </div>
+        <p class="ipucu">Sözleşme tarihi, fiyat farkı otomatik hesabında "temel dönem" olarak kullanılır (bkz. Hakediş &gt; Fiyat Farkı).</p>
+        <div class="form-satir">
             <label>Varsayılan Avans Oranı (%):</label>
             <input type="number" step="0.01" @bind="avansOrani" />
         </div>
@@ -194,6 +199,7 @@ else
     private bool excelLogoBasligiEkle = true;
 
     private decimal sozlesmeBedeli;
+    private DateOnly? sozlesmeTarihi;
     private decimal avansOrani;
     private decimal teminatOrani;
     private decimal stopajOrani;
@@ -213,6 +219,7 @@ else
         if (proje != null)
         {
             sozlesmeBedeli = proje.SozlesmeBedeli;
+            sozlesmeTarihi = proje.SozlesmeTarihi;
             avansOrani = proje.VarsayilanAvansOrani;
             teminatOrani = proje.VarsayilanTeminatOrani;
             stopajOrani = proje.VarsayilanStopajOrani;
@@ -247,7 +254,7 @@ else
     {
         if (proje == null) return;
         var sahipId = await AuthProvider.GetUserIdAsync();
-        await Veri.ProjeAyarlariGuncelle(sahipId, ProjeId, sozlesmeBedeli, avansOrani, teminatOrani, stopajOrani, kdvOrani, sgkKesintiOrani, alanM2);
+        await Veri.ProjeAyarlariGuncelle(sahipId, ProjeId, sozlesmeBedeli, sozlesmeTarihi, avansOrani, teminatOrani, stopajOrani, kdvOrani, sgkKesintiOrani, alanM2);
         proje = await Veri.ProjeBul(sahipId, ProjeId);
         ayarMesaji = "Ayarlar kaydedildi.";
     }

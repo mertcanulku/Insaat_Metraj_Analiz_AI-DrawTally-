@@ -90,15 +90,26 @@ else
         </div>
 
         <h3>Fiyat Farkı</h3>
-        <p class="ipucu">TÜİK endeks hesabı otomatik yapılmaz — oranı gir, tutar önerilsin, istersen elle değiştir.</p>
+        <p class="ipucu">TÜİK endeksinden otomatik hesaplatabilir, ya da oranı elle girip tutarı oranla önerebilirsin — her ikisi de istersen elle değiştirilebilir.</p>
+        <div class="form-satir">
+            <button type="button" @onclick="FiyatFarkiniOtomatikHesapla"><Icon Name="calculator" /> Fiyat farkını otomatik hesapla</button>
+        </div>
+        @if (!string.IsNullOrEmpty(otomatikHesapMesaji))
+        {
+            <p class="@(otomatikHesapBasarili ? "basarili-mesaj" : "hata-mesaj")">@otomatikHesapMesaji</p>
+        }
+        @if (hakedis.FiyatFarkiOtomatikMi && !string.IsNullOrEmpty(hakedis.FiyatFarkiHesaplamaOzeti))
+        {
+            <p class="ipucu"><Icon Name="calculator" Size="12" /> @hakedis.FiyatFarkiHesaplamaOzeti</p>
+        }
         <div class="form-satir">
             <label>Fiyat Farkı Oranı (%):</label>
-            <input type="number" step="0.01" @bind="hakedis.FiyatFarkiOrani" @bind:event="oninput" />
+            <input type="number" step="0.01" @bind="hakedis.FiyatFarkiOrani" @bind:event="oninput" @bind:after="FiyatFarkiElleDegistirildi" />
             <button type="button" @onclick="FiyatFarkiniOrandanHesapla">Tutarı oranla hesapla</button>
         </div>
         <div class="form-satir">
             <label>Fiyat Farkı Tutarı:</label>
-            <input type="number" step="0.01" @bind="hakedis.FiyatFarkiTutari" @bind:event="oninput" />
+            <input type="number" step="0.01" @bind="hakedis.FiyatFarkiTutari" @bind:event="oninput" @bind:after="FiyatFarkiElleDegistirildi" />
         </div>
     }
     else
@@ -117,7 +128,7 @@ else
             <tr><td>Bu Dönem İmalat Tutarı</td><td>@ParaFormatlayici.Formatla(hakedis.BuDonemImalatTutari())</td></tr>
             @if (tamKapsamliIzinli)
             {
-                <tr><td>Fiyat Farkı</td><td>@ParaFormatlayici.Formatla(hakedis.FiyatFarkiTutari)</td></tr>
+                <tr><td>Fiyat Farkı (@(hakedis.FiyatFarkiOtomatikMi ? "Otomatik" : "Elle"))</td><td>@ParaFormatlayici.Formatla(hakedis.FiyatFarkiTutari)</td></tr>
                 <tr><td>Brüt Hakediş Tutarı</td><td>@ParaFormatlayici.Formatla(hakedis.BrutHakedisTutari())</td></tr>
                 <tr><td>KDV</td><td>@ParaFormatlayici.Formatla(hakedis.KdvTutari())</td></tr>
                 <tr><td>Teminat Kesintisi</td><td>@ParaFormatlayici.Formatla(-hakedis.TeminatKesintisi())</td></tr>
@@ -165,6 +176,8 @@ else
     private int gerekenKredi;
     private int kalanKredi;
     private bool krediYetiyor = true;
+    private string otomatikHesapMesaji = "";
+    private bool otomatikHesapBasarili;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -188,6 +201,8 @@ else
                 hakedis.SgkKesintiOrani = 0;
                 hakedis.FiyatFarkiOrani = 0;
                 hakedis.FiyatFarkiTutari = 0;
+                hakedis.FiyatFarkiOtomatikMi = false;
+                hakedis.FiyatFarkiHesaplamaOzeti = "";
             }
 
             if (HakedisId == null)
@@ -201,6 +216,33 @@ else
     {
         if (hakedis == null) return;
         hakedis.FiyatFarkiTutari = hakedis.BuDonemImalatTutari() * hakedis.FiyatFarkiOrani / 100m;
+        FiyatFarkiElleDegistirildi();
+    }
+
+    /// <summary>Kullanıcı oranı/tutarı elle değiştirdiğinde otomatik hesap işaretini ve özetini temizler
+    /// — böylece kaydedilen/dışa aktarılan değerin artık elle girildiği doğru şekilde yansır.</summary>
+    private void FiyatFarkiElleDegistirildi()
+    {
+        if (hakedis == null) return;
+        hakedis.FiyatFarkiOtomatikMi = false;
+        hakedis.FiyatFarkiHesaplamaOzeti = "";
+    }
+
+    private async Task FiyatFarkiniOtomatikHesapla()
+    {
+        if (hakedis == null || sahipId == null) return;
+
+        var sonuc = await Veri.FiyatFarkiniOtomatikHesapla(sahipId, ProjeId, hakedis.Tarih, hakedis.BuDonemImalatTutari());
+        otomatikHesapBasarili = sonuc.Basarili;
+        otomatikHesapMesaji = sonuc.Basarili ? sonuc.Ozet : sonuc.Mesaj;
+
+        if (sonuc.Basarili)
+        {
+            hakedis.FiyatFarkiOrani = sonuc.Oran;
+            hakedis.FiyatFarkiTutari = sonuc.Tutar;
+            hakedis.FiyatFarkiOtomatikMi = true;
+            hakedis.FiyatFarkiHesaplamaOzeti = sonuc.Ozet;
+        }
     }
 
     private async Task Kaydet()
@@ -211,7 +253,7 @@ else
         var sonuc = await Veri.HakedisKaydet(
             sahipId, ProjeId, HakedisId, hakedis.Tarih,
             hakedis.AvansOrani, hakedis.TeminatOrani, hakedis.StopajOrani, hakedis.KdvOrani, hakedis.SgkKesintiOrani,
-            hakedis.FiyatFarkiOrani, hakedis.FiyatFarkiTutari,
+            hakedis.FiyatFarkiOrani, hakedis.FiyatFarkiTutari, hakedis.FiyatFarkiOtomatikMi, hakedis.FiyatFarkiHesaplamaOzeti,
             yuzdeler);
 
         sonMesaj = sonuc.Mesaj;

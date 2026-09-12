@@ -25,6 +25,12 @@ public class HakedisKaydi
     /// <summary>Hakediş hesabında asıl kullanılan fiyat farkı tutarı — oran ile önerilir ama elle değiştirilebilir.</summary>
     public decimal FiyatFarkiTutari { get; set; }
 
+    /// <summary>true ise FiyatFarkiOrani/Tutari son olarak FiyatFarkiHesaplamaServisi tarafından otomatik hesaplandı; false ise elle girildi/değiştirildi.</summary>
+    public bool FiyatFarkiOtomatikMi { get; set; }
+
+    /// <summary>Otomatik hesaplama yapıldıysa hangi endeks dönemlerinin kullanıldığını özetler — export'larda ve formda şeffaflık için gösterilir.</summary>
+    public string FiyatFarkiHesaplamaOzeti { get; set; } = "";
+
     public List<HakedisKalemiKaydi> Kalemler { get; set; } = new();
 }
 

@@ -9,6 +9,11 @@ public class Proje
     /// <summary>Hakediş hesaplarında kullanılan sözleşme bedeli ve varsayılan kesinti/avans oranları —
     /// bkz. Data/ProjeKaydi.cs.</summary>
     public decimal SozlesmeBedeli { get; set; }
+
+    /// <summary>Fiyat farkı hesabında "temel dönem" olarak kullanılır — bkz. FiyatFarkiHesaplamaServisi.
+    /// Boşsa fiyat farkı otomatik hesaplanamaz (kullanıcı elle oran/tutar girmeye devam edebilir).</summary>
+    public DateOnly? SozlesmeTarihi { get; set; }
+
     public decimal VarsayilanAvansOrani { get; set; }
     public decimal VarsayilanTeminatOrani { get; set; }
     public decimal VarsayilanStopajOrani { get; set; }
