@@ -100,6 +100,7 @@ public static class HakedisPdfDisaAktarimServisi
                         OzetSatiri($"KDV (%{hakedis.KdvOrani:0.##})", hakedis.KdvTutari());
                         OzetSatiri($"Teminat Kesintisi (%{hakedis.TeminatOrani:0.##})", -hakedis.TeminatKesintisi());
                         OzetSatiri($"Stopaj Kesintisi (%{hakedis.StopajOrani:0.##})", -hakedis.StopajKesintisi());
+                        OzetSatiri($"SGK Kesintisi (%{hakedis.SgkKesintiOrani:0.##})", -hakedis.SgkKesintisi());
                         OzetSatiri($"Avans Mahsubu (%{hakedis.AvansOrani:0.##})", -hakedis.AvansMahsubu());
                         ozet.Item().PaddingTop(4).Text("");
                         OzetSatiri("NET ÖDENECEK TUTAR", hakedis.NetOdenecekTutar(), vurgulu: true);

@@ -63,6 +63,7 @@ else
             <tr><td>KDV (%@hakedis.KdvOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(hakedis.KdvTutari())</td></tr>
             <tr><td>Teminat Kesintisi (%@hakedis.TeminatOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(-hakedis.TeminatKesintisi())</td></tr>
             <tr><td>Stopaj Kesintisi (%@hakedis.StopajOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(-hakedis.StopajKesintisi())</td></tr>
+            <tr><td>SGK Kesintisi (%@hakedis.SgkKesintiOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(-hakedis.SgkKesintisi())</td></tr>
             <tr><td>Avans Mahsubu (%@hakedis.AvansOrani.ToString("0.##"))</td><td>@ParaFormatlayici.Formatla(-hakedis.AvansMahsubu())</td></tr>
             <tr><td><strong><Icon Name="banknote" Size="14" /> NET ÖDENECEK TUTAR</strong></td><td><strong>@ParaFormatlayici.Formatla(hakedis.NetOdenecekTutar())</strong></td></tr>
         </tbody>

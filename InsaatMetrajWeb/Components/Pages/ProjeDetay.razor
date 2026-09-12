@@ -53,6 +53,10 @@ else
             <label>Varsayılan KDV Oranı (%):</label>
             <input type="number" step="0.01" @bind="kdvOrani" />
         </div>
+        <div class="form-satir">
+            <label>Varsayılan SGK Kesinti Oranı (%):</label>
+            <input type="number" step="0.01" @bind="sgkKesintiOrani" />
+        </div>
         <button @onclick="AyarlariKaydet"><Icon Name="check" /> Ayarları Kaydet</button>
         @if (!string.IsNullOrEmpty(ayarMesaji))
         {
@@ -194,6 +198,7 @@ else
     private decimal teminatOrani;
     private decimal stopajOrani;
     private decimal kdvOrani;
+    private decimal sgkKesintiOrani;
     private decimal alanM2;
     private string ayarMesaji = "";
 
@@ -212,6 +217,7 @@ else
             teminatOrani = proje.VarsayilanTeminatOrani;
             stopajOrani = proje.VarsayilanStopajOrani;
             kdvOrani = proje.VarsayilanKdvOrani;
+            sgkKesintiOrani = proje.VarsayilanSgkKesintiOrani;
             alanM2 = proje.AlanM2;
 
             var kullanici = await UserManager.FindByIdAsync(sahipId);
@@ -241,7 +247,7 @@ else
     {
         if (proje == null) return;
         var sahipId = await AuthProvider.GetUserIdAsync();
-        await Veri.ProjeAyarlariGuncelle(sahipId, ProjeId, sozlesmeBedeli, avansOrani, teminatOrani, stopajOrani, kdvOrani, alanM2);
+        await Veri.ProjeAyarlariGuncelle(sahipId, ProjeId, sozlesmeBedeli, avansOrani, teminatOrani, stopajOrani, kdvOrani, sgkKesintiOrani, alanM2);
         proje = await Veri.ProjeBul(sahipId, ProjeId);
         ayarMesaji = "Ayarlar kaydedildi.";
     }

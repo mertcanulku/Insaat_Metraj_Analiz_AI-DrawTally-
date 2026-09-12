@@ -91,6 +91,7 @@ public static class HakedisExcelDisaAktarimServisi
         OzetEkle($"KDV (%{hakedis.KdvOrani:0.##})", hakedis.KdvTutari());
         OzetEkle($"Teminat Kesintisi (%{hakedis.TeminatOrani:0.##})", -hakedis.TeminatKesintisi());
         OzetEkle($"Stopaj Kesintisi (%{hakedis.StopajOrani:0.##})", -hakedis.StopajKesintisi());
+        OzetEkle($"SGK Kesintisi (%{hakedis.SgkKesintiOrani:0.##})", -hakedis.SgkKesintisi());
         OzetEkle($"Avans Mahsubu (%{hakedis.AvansOrani:0.##})", -hakedis.AvansMahsubu());
         OzetEkle("NET ÖDENECEK TUTAR", hakedis.NetOdenecekTutar(), vurgulu: true);
 

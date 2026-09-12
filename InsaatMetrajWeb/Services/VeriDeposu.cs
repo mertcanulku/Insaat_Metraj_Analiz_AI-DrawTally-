@@ -67,6 +67,7 @@ public class VeriDeposu
         VarsayilanTeminatOrani = kayit.VarsayilanTeminatOrani,
         VarsayilanStopajOrani = kayit.VarsayilanStopajOrani,
         VarsayilanKdvOrani = kayit.VarsayilanKdvOrani,
+        VarsayilanSgkKesintiOrani = kayit.VarsayilanSgkKesintiOrani,
         AlanM2 = kayit.AlanM2,
         MetrajKalemleri = kayit.MetrajKalemleri
             .Select(k => PozIdIleBul(k.PozId) is { } poz
@@ -78,7 +79,7 @@ public class VeriDeposu
     };
 
     /// <summary>Hakediş hesaplarında kullanılan sözleşme bedeli, varsayılan oranları ve proje alanını (m² — hakediş kredisi hesabında kullanılır) günceller.</summary>
-    public async Task ProjeAyarlariGuncelle(string sahipId, int projeId, decimal sozlesmeBedeli, decimal avansOrani, decimal teminatOrani, decimal stopajOrani, decimal kdvOrani, decimal alanM2)
+    public async Task ProjeAyarlariGuncelle(string sahipId, int projeId, decimal sozlesmeBedeli, decimal avansOrani, decimal teminatOrani, decimal stopajOrani, decimal kdvOrani, decimal sgkKesintiOrani, decimal alanM2)
     {
         var kayit = await _db.Projeler.FirstOrDefaultAsync(p => p.Id == projeId && p.SahipId == sahipId);
         if (kayit == null) return;
@@ -88,6 +89,7 @@ public class VeriDeposu
         kayit.VarsayilanTeminatOrani = teminatOrani;
         kayit.VarsayilanStopajOrani = stopajOrani;
         kayit.VarsayilanKdvOrani = kdvOrani;
+        kayit.VarsayilanSgkKesintiOrani = sgkKesintiOrani;
         kayit.AlanM2 = alanM2;
         await _db.SaveChangesAsync();
     }
@@ -496,6 +498,7 @@ public class VeriDeposu
             TeminatOrani = kayit.TeminatOrani,
             StopajOrani = kayit.StopajOrani,
             KdvOrani = kayit.KdvOrani,
+            SgkKesintiOrani = kayit.SgkKesintiOrani,
             FiyatFarkiOrani = kayit.FiyatFarkiOrani,
             FiyatFarkiTutari = kayit.FiyatFarkiTutari,
             Kalemler = kayit.Kalemler
@@ -536,6 +539,7 @@ public class VeriDeposu
             TeminatOrani = proje.VarsayilanTeminatOrani,
             StopajOrani = proje.VarsayilanStopajOrani,
             KdvOrani = proje.VarsayilanKdvOrani,
+            SgkKesintiOrani = proje.VarsayilanSgkKesintiOrani,
             Kalemler = proje.MetrajKalemleri.Select(mk =>
             {
                 var oncekiYuzde = sonKayit?.Kalemler.FirstOrDefault(k => k.MetrajKalemiKaydiId == mk.Id)?.KumulatifYuzde ?? 0;
@@ -551,7 +555,7 @@ public class VeriDeposu
     /// </summary>
     public async Task<HakedisKaydetSonucu> HakedisKaydet(
         string sahipId, int projeId, int? mevcutHakedisId, DateOnly tarih,
-        decimal avansOrani, decimal teminatOrani, decimal stopajOrani, decimal kdvOrani,
+        decimal avansOrani, decimal teminatOrani, decimal stopajOrani, decimal kdvOrani, decimal sgkKesintiOrani,
         decimal fiyatFarkiOrani, decimal fiyatFarkiTutari,
         Dictionary<int, decimal> kalemYuzdeleri)
     {
@@ -622,6 +626,7 @@ public class VeriDeposu
         kayit.TeminatOrani = teminatOrani;
         kayit.StopajOrani = stopajOrani;
         kayit.KdvOrani = kdvOrani;
+        kayit.SgkKesintiOrani = sgkKesintiOrani;
         kayit.FiyatFarkiOrani = fiyatFarkiOrani;
         kayit.FiyatFarkiTutari = fiyatFarkiTutari;
 

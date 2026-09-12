@@ -13,6 +13,7 @@ public class Proje
     public decimal VarsayilanTeminatOrani { get; set; }
     public decimal VarsayilanStopajOrani { get; set; }
     public decimal VarsayilanKdvOrani { get; set; } = 20;
+    public decimal VarsayilanSgkKesintiOrani { get; set; }
     public decimal AlanM2 { get; set; }
 
     public decimal ToplamMaliyet() => MetrajKalemleri.Sum(k => k.ToplamMaliyet());

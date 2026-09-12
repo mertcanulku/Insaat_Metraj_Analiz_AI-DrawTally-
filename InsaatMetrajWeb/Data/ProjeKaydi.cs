@@ -18,6 +18,7 @@ public class ProjeKaydi
     public decimal VarsayilanTeminatOrani { get; set; }
     public decimal VarsayilanStopajOrani { get; set; }
     public decimal VarsayilanKdvOrani { get; set; } = 20;
+    public decimal VarsayilanSgkKesintiOrani { get; set; }
 
     /// <summary>Projenin toplam alanı (m²) — hakediş oluşturma kredisi bu değere göre hesaplanır, bkz. UyelikServisi.HakedisKrediMaliyeti.</summary>
     public decimal AlanM2 { get; set; }

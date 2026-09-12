@@ -19,6 +19,7 @@ public class Hakedis
     public decimal TeminatOrani { get; set; }
     public decimal StopajOrani { get; set; }
     public decimal KdvOrani { get; set; }
+    public decimal SgkKesintiOrani { get; set; }
 
     public decimal FiyatFarkiOrani { get; set; }
     public decimal FiyatFarkiTutari { get; set; }
@@ -37,12 +38,14 @@ public class Hakedis
 
     public decimal StopajKesintisi() => BrutHakedisTutari() * StopajOrani / 100m;
 
+    public decimal SgkKesintisi() => BrutHakedisTutari() * SgkKesintiOrani / 100m;
+
     public decimal AvansMahsubu() => BrutHakedisTutari() * AvansOrani / 100m;
 
     public decimal KdvTutari() => BrutHakedisTutari() * KdvOrani / 100m;
 
     public decimal NetOdenecekTutar() =>
-        BrutHakedisTutari() + KdvTutari() - TeminatKesintisi() - StopajKesintisi() - AvansMahsubu();
+        BrutHakedisTutari() + KdvTutari() - TeminatKesintisi() - StopajKesintisi() - SgkKesintisi() - AvansMahsubu();
 }
 
 /// <summary>Bir hakedişte tek bir metraj kalemine ait kümülatif/dönem hesabı.</summary>

@@ -17,6 +17,7 @@ public class HakedisKaydi
     public decimal TeminatOrani { get; set; }
     public decimal StopajOrani { get; set; }
     public decimal KdvOrani { get; set; }
+    public decimal SgkKesintiOrani { get; set; }
 
     /// <summary>Fiyat farkı için yardımcı oran — TÜİK endeksi otomasyonu yok, sadece FiyatFarkiTutari'nı önermek için kullanılır.</summary>
     public decimal FiyatFarkiOrani { get; set; }
